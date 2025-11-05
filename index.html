@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Nextbike GeoData Downloader</title>
+  <link rel="icon" type="image/png" href="favicon.png">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css"> 
+</head>
+<body>
+  <div class="wrap" id="main-wrap">
+    <section class="panel" id="left-panel">
+      <div class="panel-content">
+        <label for="countrySelect" class="label-de-emphasized">Land filtern (optional)</label>
+        <select id="countrySelect"></select>
+
+        <label for="brandInput" class="label-emphasized">Marke/System suchen</label>
+        <div class="autocomplete-container">
+            <input type="text" id="brandInput" placeholder="Marke/System tippen..." disabled>
+            <div class="autocomplete-results" id="brandResults"></div>
+        </div>
+
+        <label for="citySelect" class="label-de-emphasized">Stadt filtern (optional)</label>
+        <select id="citySelect" disabled></select>
+
+        <div id="filter-controls" class="tool-section hidden">
+            <hr style="border:none; border-top: 1px solid var(--border-gray); margin: 20px 0;">
+            <div>
+                <label for="quickFilter">Schnellfilter</label>
+                <input id="quickFilter" type="text" placeholder="z.B. „Hauptbahnhof“" />
+            </div>
+            
+            <div class="checkbox-container hidden" id="flexzone-toggle-container">
+                <input type="checkbox" id="flexzonesCheckbox" checked>
+                <label for="flexzonesCheckbox">Flexzonen anzeigen</label>
+
+              <input type="checkbox" id="businessAreasCheckbox" checked>
+              <label for="businessAreasCheckbox">Business Areas anzeigen</label>
+            </div>
+            
+            <div class="row">
+              <button class="primary" id="loadBtn"><span id="loadIcon"></span>laden</button>
+            </div>
+            <div class="load-status" id="load-status">Initialisiere...</div>
+        </div>
+        <div id="isochrone-controls" class="tool-section hidden"> 
+            <hr style="border:none; border-top: 1px solid var(--border-gray); margin: 20px 0;">
+            <label class="label-emphasized" for="orsProfileSelect">ORS Profil wählen</label>
+            <select id="orsProfileSelect" style="margin-bottom: 15px;">
+                <option value="driving-car" selected>🚗 Auto</option>
+                <option value="cycling-regular">🚲 Fahrrad</option>
+                <option value="foot-walking">🚶 Zu Fuß</option>
+            </select>
+            
+            <label class="label-emphasized" style="margin-bottom: 0;">Fahrzeit (Range)</label>
+            <p style="font-size: 0.9rem; color: var(--text-muted); margin-top: 5px; margin-bottom: 10px;">
+                1. Zeit wählen ⏱️. 2. Auf Karte klicken, um Punkte zu setzen (max. 5).
+            </p>
+
+            <div class="grid" style="grid-template-columns: repeat(4, 1fr); gap: 8px;">
+                <button id="range15min" class="ors-range-btn" data-range="900">15 min</button>
+                <button id="range30min" class="ors-range-btn" data-range="1800">30 min</button>
+                <button id="range45min" class="ors-range-btn" data-range="2700">45 min</button>
+                <button id="range60min" class="ors-range-btn" data-range="3600">60 min</button>
+            </div>
+            
+            <div class="row" style="margin-top: 10px; display: grid; grid-template-columns: 2fr 1fr; gap: 10px;">
+                <button class="primary" id="calculateIsochroneBtn" disabled>
+                    <span id="calcIcon"></span> Isochrone berechnen
+                </button>
+                <button class="primary" id="clearIsochroneBtn" style="background-color: #6C757D; padding: 10px 0;" disabled>🗑️ Alle löschen</button>
+            </div>
+            
+            <div class="load-status" id="isochrone-status" style="visibility: visible; margin-top: 10px; background-color: #f7f7f7; color: var(--nextbike-dark-blue);">
+                Bitte wählen Sie ein Profil und eine Zeit aus.
+            </div>
+        </div>
+        </div>
+    </section>
+
+    <div class="toggle-container" id="left-toggle-container">
+        <button id="toggle-left-panel" class="panel-toggle-btn" title="Steuerung einklappen">◀</button>
+    </div>
+
+    <section id="map-container">
+        <div id="top-toolbar">
+            <a href="#" id="toolbar-filter-btn" title="Daten filtern & laden" role="button" aria-label="Daten filtern und laden" data-target="filter-controls" class="toolbar-btn top-bar-btn">
+                <i class="fa-solid fa-list-ul"></i> Daten & Filter
+            </a>
+            <a href="#" id="toolbar-iso-btn" title="Isochrone berechnen" role="button" aria-label="Isochrone berechnen" data-target="isochrone-controls" class="toolbar-btn top-bar-btn">
+                <i class="fa-solid fa-route"></i> Isochrone
+            </a>
+            </div>
+
+      <div id="map"></div>
+    </section>
+
+    <div class="toggle-container" id="right-toggle-container">
+        <button id="toggle-right-panel" class="panel-toggle-btn" title="GeoJSON einklappen">▶</button>
+    </div>
+
+    <section class="panel" id="right-panel">
+        <div class="panel-content" style="display: flex; flex-direction: column;">
+            <textarea id="geojson-output" readonly placeholder="Hier erscheint der GeoJSON-Code..."></textarea>
+            <div class="row">
+                <button class="primary" id="geojsonBtn" disabled>💾 Stationen (.geojson)</button>
+                <button class="primary" id="zipBtn" disabled>💾 System (.geojson in .zip)</button>
+            </div>
+        </div>
+    </section>
+  </div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/file-saver@2.0.5/dist/FileSaver.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+  <script src="script.js" defer></script>
+</body>
+</html>
