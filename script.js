@@ -15,6 +15,7 @@ let allBusinessAreas = []; // Speichert alle geladenen Business Area-Features
 let activeToolId = null; // GEÄNDERT: Kein Tool ist beim Start aktiv - ID des aktuell geöffneten Tools in der Sidebar
 
 // --- Globale Variablen für Isochronen (ORS) ---
+let cityLayer = L.featureGroup(); // Layer für die Städte des ausgewählten Nextbike-Systems
 let isochroneLayer = null; // Layer für das Polygon der berechneten Isochrone
 let clickMarkers = L.featureGroup(); // FeatureGroup zum Speichern der vom Benutzer gesetzten Start-Marker
 let selectedRange = 0; // Die aktuell ausgewählte Zeit in Sekunden (für die Isochrone)
@@ -32,6 +33,13 @@ const nextbikeIcon = L.icon({ // Spezielles Icon für Nextbike-Stationen
     iconSize:     [35, 35],
     iconAnchor:   [17, 35],
     popupAnchor:  [0, -35]
+});
+
+const cityIcon = L.icon({ // Icon für Städte-Marker
+    iconSize:     [50, 50],
+    iconAnchor:   [25, 50],
+    popupAnchor:  [0, -50],
+    iconUrl: 'favicon.png'
 });
 
 /**
@@ -103,15 +111,8 @@ function initIsochroneFunctionality(baseMaps) {
     // Fügt Marker-Gruppe (Startpunkte) zur Karte hinzu
     clickMarkers.addTo(map);
 
-    // Fügt den Isochronen-Layer zur zentralisierten Leaflet Layer Control hinzu
-    mapLayersControl = L.control.layers(baseMaps, { 
-        "Stationen": layer, // Nextbike-Stationen
-        "Flexzonen": flexzoneLayer, // Flexzonen
-        "Business Areas": businessAreaLayer, // Business Areas
-        "ORS Isochrone": isochroneLayer, // Isochrone-Ergebnis
-        "Startpunkte": clickMarkers // Isochronen-Startpunkte
-    }).addTo(map);
-    
+    cityLayer.addTo(map);
+
     // Click-Handler für die Karte, um den Ausgangspunkt zu setzen (aktiviert nur, wenn Zeit gewählt)
     map.on('click', onMapClickForIsochrone);
     
@@ -377,7 +378,16 @@ function initMap(){
     map.setView([51.1657, 10.4515], 6);
     
     // Zentralisierte Initialisierung der Isochronen-Funktionalität UND Layer-Kontrolle
-    initIsochroneFunctionality(baseMaps); 
+    initIsochroneFunctionality(baseMaps);
+
+    mapLayersControl = L.control.layers(baseMaps, { 
+        "Stationen": layer, // Nextbike-Stationen
+        "Flexzonen": flexzoneLayer, // Flexzonen
+        "Business Areas": businessAreaLayer, // Business Areas
+        "ORS Isochrone": isochroneLayer, // Isochrone-Ergebnis
+        "Startpunkte": clickMarkers, // Isochronen-Startpunkte
+        "Nextbike Städte": cityLayer // Städte des ausgewählten Nextbike-Systems
+    }).addTo(map);
 }
 
 // Hilfsfunktion zum Erstellen eines <option>-Elements
@@ -448,6 +458,7 @@ async function loadLists(){
         updateAvailableBrands(); // Aktualisiert die verfügbaren Marken (relevant für die Suche)
         $('#load-status').textContent = 'Bitte Auswahl treffen.';
         
+        drawAllCityMarkers(); // Zeichnet alle Städte-Marker auf der Karte
         loadAllFlexzones(); // Startet das Laden aller Flexzonen-Daten im Hintergrund
         loadAllBusinessAreas(); // Startet das Laden aller Business Area-Daten im Hintergrund
     }catch(e){
@@ -526,38 +537,116 @@ function updateAvailableBrands(){
 }
 
 // Ruft die Städte für eine spezifische Nextbike-Domäne ab
-async function fetchCitiesForBrand(domain){
-    // API-Aufruf, um die Städte für die angegebene Domäne zu erhalten
-    const url = `${corsProxy}https://maps.nextbike.net/maps/nextbike-official.json?domains=${encodeURIComponent(domain)}&bikes=0`;
-    const resp = await fetch(url, { cache: 'no-store' });
-    if(!resp.ok) throw new Error(`HTTP ${resp.status}`);
-    const data = await resp.json();
-    const out = [];
-    // Extrahiert Städte-Informationen aus der API-Antwort
-    data.countries?.forEach(co => {
+function fetchCitiesForBrand(domain) { 
+    const out = [];
+
+    // Iteriere durch die global geladenen Rohdaten: rawCountries
+    rawCountries.forEach(co => {
         const cc = (co.country || co.country_code || '').toUpperCase();
-        co.cities?.forEach(city => out.push({ uid: city.uid, name: city.name || city.alias || city.city || `#${city.uid}`, country_code: cc }));
+        // Hole die Domäne des Top-Level-Objekts (Land/Hauptsystem)
+        const countryDomain = (co.domain || '').toLowerCase(); 
+
+        co.cities?.forEach(city => {
+            // Hole die Domäne des Stadt-Objekts
+            const cityDomain = (city.domain || '').toLowerCase(); 
+
+            // Prüft: 1. Ist die gesuchte Domain gleich der Domain des Landes ODER der Stadt? 
+            //        2. Hat die Stadt Koordinaten?
+            if ((cityDomain === domain.toLowerCase() || countryDomain === domain.toLowerCase()) && 
+                 typeof city.lat === 'number' && typeof city.lng === 'number') {
+                out.push({ 
+                    uid: city.uid, 
+                    name: city.name || city.alias || city.city || `#${city.uid}`, 
+                    country_code: cc,
+                    lat: city.lat, 
+                    lng: city.lng
+                });
+            }
+        });
     });
     // Entfernt Duplikate nach der UID und gibt die Liste zurück
     return [...new Map(out.map(item => [item.uid, item])).values()];
 }
 
+/**
+ * Zeichnet alle verfügbaren Nextbike-Städte auf der Karte und zoomt auf deren Ausdehnung.
+ */
+function drawAllCityMarkers() {
+    cityLayer.clearLayers();
+    const out = [];
+
+    // Sammelt alle Städte aus rawCountries (ohne Domänenfilter)
+    rawCountries.forEach(co => {
+        const cc = (co.country || co.country_code || '').toUpperCase();
+        co.cities?.forEach(city => {
+            // Wichtig: Nur Städte mit Koordinaten einschließen
+            if (typeof city.lat === 'number' && typeof city.lng === 'number') {
+                out.push({ 
+                    uid: city.uid, 
+                    name: city.name || city.alias || city.city || `#${city.uid}`, 
+                    country_code: cc,
+                    domain: city.domain || co.domain || '',
+                    lat: city.lat, 
+                    lng: city.lng
+                });
+            }
+        });
+    });
+
+    // Erstellt Marker für alle gefundenen Städte
+    out.forEach(city => {
+        const marker = L.marker([city.lat, city.lng], { 
+            icon: cityIcon // Nutzt das definierte cityIcon
+        });
+        
+        const popupContent = `
+            <b>${city.name}</b><br>
+            System: ${city.domain || 'N/A'}<br>
+            Land: ${city.country_code}
+        `;
+        marker.bindPopup(popupContent);
+        
+        cityLayer.addLayer(marker);
+    });
+
+    // Zoomt auf die Ausdehnung aller Stadt-Marker
+    if (cityLayer.getLayers().length > 0) {
+        map.fitBounds(cityLayer.getBounds(), {padding: [50, 50]});
+    }
+}
+
+
 // Aktualisiert das Städte-Dropdown, nachdem eine Marke ausgewählt oder das Land geändert wurde
 async function refreshCitySelect(){
+    // WICHTIG: Die Marker werden NICHT mehr hier gezeichnet, nur das Dropdown wird gefüllt/gefiltert.
     const brandKey = selectedBrandDomain;
     const citySel = $('#citySelect');
     const countryCode = ($('#countrySelect').value || '').toUpperCase();
     citySel.innerHTML = '<option value="">Alle Städte im System</option>';
-    if(!brandKey){ citySel.disabled = true; return; } // Wenn keine Marke ausgewählt ist
+    
+    if(!brandKey){ 
+        citySel.disabled = true; 
+        return; 
+    } 
     try{
-        let items = await fetchCitiesForBrand(brandKey); // Lädt Städte für die Marke
+        // Wir können await hier behalten, obwohl fetchCitiesForBrand synchron ist
+        let items = await fetchCitiesForBrand(brandKey); 
+        
         // Filtert zusätzlich nach Land, falls ausgewählt
         if(countryCode) items = items.filter(c => (c.country_code||'') === countryCode);
         items.sort((a,b)=> (a.name||'').localeCompare(b.name||''));
-        // Füllt das Dropdown mit den Städten
-        items.forEach(c => citySel.appendChild(option(String(c.uid), c.name)));
+        
+        // Füllt das Dropdown
+        items.forEach(city => {
+            citySel.appendChild(option(String(city.uid), city.name));
+        });
+
         citySel.disabled = false;
-    }catch(e){ console.error(e); citySel.disabled = true; }
+
+    }catch(e){ 
+        console.error("Fehler beim Laden/Anzeigen der Städte:", e); 
+        citySel.disabled = true; 
+    }
 }
 
 // Konvertiert das Nextbike-JSON-Format in ein GeoJSON FeatureCollection-Objekt
@@ -653,7 +742,7 @@ async function loadData(){
         }
         
         // Passt den Kartenausschnitt an die geladenen Daten an (Stationen, Flexzonen, Business Areas)
-        const combinedLayer = L.featureGroup([...layer.getLayers(), ...flexzoneLayer.getLayers(), ...businessAreaLayer.getLayers()]);
+        const combinedLayer = L.featureGroup([...layer.getLayers(), ...flexzoneLayer.getLayers(), ... cityLayer.getLayers(), ...businessAreaLayer.getLayers()]);
         if (combinedLayer.getLayers().length > 0) {
             const bounds = combinedLayer.getBounds();
             if (bounds.isValid()) {
@@ -910,3 +999,14 @@ window.addEventListener('DOMContentLoaded', () => {
     });
 
 });
+
+// ENDE DER DATEI HINZUFÜGEN
+// Leaflet Standard-Icon-Fix (falls Pfade für Standard-Assets fehlen)
+delete L.Icon.Default.prototype._getIconUrl;
+
+L.Icon.Default.mergeOptions({
+    iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
+    iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
+    shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png'
+});
+// ENDE DER DATEI HINZUFÜGEN
