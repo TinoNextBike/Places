@@ -174,6 +174,51 @@ function clearIsochrone() {
     $('#calcIcon').innerHTML = ''; // Entfernt den Lade-Spinner, falls vorhanden
 }
 
+/**
+ * Setzt die Kartenansicht und den UI-Status zurück, um alle Nextbike-Systeme
+ * (Städte-Marker) wieder anzuzeigen.
+ */
+function resetSystemView() {
+    // 1. Karten-Layer und Marker löschen
+    layer.clearLayers(); // Löscht Stations-Layer
+    flexzoneLayer.clearLayers(); // Löscht Flexzonen
+    businessAreaLayer.clearLayers(); // Löscht Business Areas
+    isochroneLayer.clearLayers(); // Löscht Isochrone
+    clickMarkers.clearLayers(); // Löscht Isochronen-Startpunkte
+    
+    // 2. Globale Variablen zurücksetzen
+    selectedBrandDomain = null; // Kein System mehr ausgewählt
+    currentGeoJSON = null; // Kein Stations-GeoJSON mehr geladen
+    
+    // 3. UI-Elemente zurücksetzen
+    $('#countrySelect').value = ''; // Land zurücksetzen
+    $('#brandInput').value = ''; // Suchfeld zurücksetzen
+    $('#citySelect').innerHTML = '<option value="">Alle Städte im System</option>'; // Städte-Dropdown zurücksetzen
+    $('#citySelect').disabled = true;
+    $('#quickFilter').value = ''; // Schnellsuchfilter zurücksetzen
+    $('#load-status').textContent = 'Bitte Auswahl treffen.';
+    $('#geojson-output').value = '';
+    $('#flexzone-toggle-container').classList.add('hidden');
+    $('#geojsonBtn').disabled = true;
+    $('#zipBtn').disabled = true;
+
+    // 4. City-Marker (alle) wieder anzeigen und auf ihre Bounds zoomen
+    cityLayer.eachLayer(marker => {
+        // Stellt sicher, dass alle City-Marker wieder sichtbar sind
+        if (marker.getElement()) {
+            marker.getElement().style.display = '';
+        }
+    });
+
+    // Zoomt auf die Ausdehnung aller Stadt-Marker
+    if (cityLayer.getLayers().length > 0) {
+        map.fitBounds(cityLayer.getBounds(), {padding: [50, 50]});
+    } else {
+        // Fallback-Ansicht, falls keine City-Marker vorhanden sind
+        map.setView([51.1657, 10.4515], 6); // Setzt auf Standardansicht Deutschland
+    }
+}
+
 // Behandelt Karten-Klicks für den Isochronen-Startpunkt
 function onMapClickForIsochrone(e) {
     if (activeToolId !== 'isochrone-controls') return; // Funktion nur ausführen, wenn das Isochronen-Tool aktiv ist
@@ -571,21 +616,30 @@ function fetchCitiesForBrand(domain) {
 /**
  * Zeichnet alle verfügbaren Nextbike-Städte auf der Karte und zoomt auf deren Ausdehnung.
  */
+// Funktion drawAllCityMarkers (Komplett ersetzen)
+/**
+ * Zeichnet alle verfügbaren Nextbike-Städte auf der Karte, bindet den Klick-Handler zum Laden des Systems
+ * und zoomt auf deren gesamte Ausdehnung.
+ */
 function drawAllCityMarkers() {
     cityLayer.clearLayers();
     const out = [];
 
-    // Sammelt alle Städte aus rawCountries (ohne Domänenfilter)
+    // Sammelt alle Städte aus rawCountries
     rawCountries.forEach(co => {
         const cc = (co.country || co.country_code || '').toUpperCase();
+        const countryDomain = (co.domain || '').toLowerCase(); 
+
         co.cities?.forEach(city => {
+            const cityDomain = (city.domain || '').toLowerCase(); 
+
             // Wichtig: Nur Städte mit Koordinaten einschließen
             if (typeof city.lat === 'number' && typeof city.lng === 'number') {
                 out.push({ 
                     uid: city.uid, 
                     name: city.name || city.alias || city.city || `#${city.uid}`, 
                     country_code: cc,
-                    domain: city.domain || co.domain || '',
+                    domain: cityDomain || countryDomain || '',
                     lat: city.lat, 
                     lng: city.lng
                 });
@@ -596,20 +650,33 @@ function drawAllCityMarkers() {
     // Erstellt Marker für alle gefundenen Städte
     out.forEach(city => {
         const marker = L.marker([city.lat, city.lng], { 
-            icon: cityIcon // Nutzt das definierte cityIcon
+            icon: cityIcon,
+            _domain: city.domain // Speichert die Domain für refreshCitySelect zur Filterung
         });
         
-        const popupContent = `
-            <b>${city.name}</b><br>
-            System: ${city.domain || 'N/A'}<br>
-            Land: ${city.country_code}
-        `;
+        // Klick-Handler: Löst den Ladevorgang aus
+        marker.on('click', function() {
+            // 1. Speichert die Domain und aktualisiert das Suchfeld
+            selectedBrandDomain = city.domain; 
+            $('#brandInput').value = city.name; 
+            
+            // 2. Blendet Flexzonen-Toggle ein
+            $('#flexzone-toggle-container').classList.remove('hidden'); 
+
+            // 3. LÖST DEN ZOOMEFFEKT UND DAS LADEN AUS
+            loadData(); 
+
+            // 4. Blendet die NICHT ausgewählten City-Marker aus
+            refreshCitySelect();
+        });
+
+        const popupContent = `<b>${city.name}</b><br>System: ${city.domain || 'N/A'}<br>Land: ${city.country_code}`;
         marker.bindPopup(popupContent);
         
         cityLayer.addLayer(marker);
     });
-
-    // Zoomt auf die Ausdehnung aller Stadt-Marker
+    
+    // Zoomt auf die Ausdehnung aller Stadt-Marker beim INITIALEN LADEN
     if (cityLayer.getLayers().length > 0) {
         map.fitBounds(cityLayer.getBounds(), {padding: [50, 50]});
     }
@@ -617,11 +684,21 @@ function drawAllCityMarkers() {
 
 
 // Aktualisiert das Städte-Dropdown, nachdem eine Marke ausgewählt oder das Land geändert wurde
+// Aktualisiert das Städte-Dropdown und filtert die Sichtbarkeit der Marker
 async function refreshCitySelect(){
-    // WICHTIG: Die Marker werden NICHT mehr hier gezeichnet, nur das Dropdown wird gefüllt/gefiltert.
-    const brandKey = selectedBrandDomain;
+    const brandKey = selectedBrandDomain;
     const citySel = $('#citySelect');
-    const countryCode = ($('#countrySelect').value || '').toUpperCase();
+    
+    // 1. Marker filtern: Zeige alle, wenn keine Marke gewählt, sonst nur die passenden.
+    cityLayer.eachLayer(marker => {
+        // Nutzt das in drawAllCityMarkers zugewiesene options._domain Attribut
+        const domainMatch = !brandKey || marker.options._domain === brandKey; 
+        const displayStyle = domainMatch ? '' : 'none';
+        
+        marker.getElement().style.display = displayStyle;
+    });
+
+    // 2. Dropdown zurücksetzen
     citySel.innerHTML = '<option value="">Alle Städte im System</option>';
     
     if(!brandKey){ 
@@ -629,14 +706,11 @@ async function refreshCitySelect(){
         return; 
     } 
     try{
-        // Wir können await hier behalten, obwohl fetchCitiesForBrand synchron ist
+        // 3. Dropdown-Inhalte für die gewählte Marke laden
         let items = await fetchCitiesForBrand(brandKey); 
         
-        // Filtert zusätzlich nach Land, falls ausgewählt
-        if(countryCode) items = items.filter(c => (c.country_code||'') === countryCode);
         items.sort((a,b)=> (a.name||'').localeCompare(b.name||''));
         
-        // Füllt das Dropdown
         items.forEach(city => {
             citySel.appendChild(option(String(city.uid), city.name));
         });
@@ -954,6 +1028,15 @@ window.addEventListener('DOMContentLoaded', () => {
     setupSidebars(); // Richtet die Funktionalität der Sidebars ein
     setupBrandSearch(); // Richtet die Markensuche ein
     setupToolbar(); // Richtet die Toolbar-Logik ein
+    // NEU: Event Listener für die ESC-Taste
+    document.addEventListener('keydown', (e) => {
+        // Prüft, ob die ESC-Taste gedrückt wurde UND ein System ausgewählt ist (selectedBrandDomain != null)
+        if (e.key === 'Escape' && selectedBrandDomain) {
+            // Verhindert das Standardverhalten des Browsers, falls die ESC-Taste anderweitig belegt ist
+            e.preventDefault(); 
+            resetSystemView();
+        }
+    });
     
     $('#loadBtn').addEventListener('click', loadData); // Event Listener für den Daten-Laden-Button
     
@@ -999,6 +1082,7 @@ window.addEventListener('DOMContentLoaded', () => {
     });
 
 });
+
 
 // ENDE DER DATEI HINZUFÜGEN
 // Leaflet Standard-Icon-Fix (falls Pfade für Standard-Assets fehlen)
