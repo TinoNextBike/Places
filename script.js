@@ -1,5 +1,5 @@
 // Neue Konstante für den API-Schlüssel (Bestätigter Wert)
-const ORS_API_KEY = 'eyJvcmciOiI1YjNjZTM1OTc4NTExMTAwMDFjZjYyNDgiLCJpZCI6IjJiMWZmNzYzNGZjMTRlYzlhODY0ZjMyOWE3ODFkNmVlIiwiaCI6Im11cm11cjY0In0='; // API-Schlüssel für den OpenRouteService (ORS)
+const ORS_API_KEY = 'eyJvcmciOiI1YjNjZTM1OTc4NTExMTEwMDFjZjYyNDgiLCJpZCI6IjJiMWZmNzYzNGZjMTRlYzlhODY0ZjMyOWE3ODFkNmVlIiwiaCI6Im11cm11cjY0In0='; // API-Schlüssel für den OpenRouteService (ORS)
 const ORS_BASE_ENDPOINT = 'https://api.openrouteservice.org/v2/isochrones/'; // Basis-Endpunkt der ORS Isochronen-API
 
 const $ = sel => document.querySelector(sel); // Vereinfachte Funktion für document.querySelector (DOM-Abfrage)
@@ -12,7 +12,7 @@ let countryList = [], rawCountries = [], brandList = [], availableBrands = []; /
 let selectedBrandDomain = null; // Die Domäne des aktuell ausgewählten Nextbike-Systems
 let allFlexzones = []; // Speichert alle geladenen Flexzonen-Features
 let allBusinessAreas = []; // Speichert alle geladenen Business Area-Features
-let activeToolId = null; // GEÄNDERT: Kein Tool ist beim Start aktiv - ID des aktuell geöffneten Tools in der Sidebar
+let activeToolId = null; // ID des aktuell geöffneten Tools in der Sidebar
 
 // --- Globale Variablen für Isochronen (ORS) ---
 let cityLayer = L.featureGroup(); // Layer für die Städte des ausgewählten Nextbike-Systems
@@ -44,88 +44,65 @@ const cityIcon = L.icon({ // Icon für Städte-Marker
 
 /**
  * Steuert, welche Werkzeug-Sektion im linken Panel aktiv ist.
- * Beim erneuten Klick auf das aktive Tool wird dieses geschlossen.
  * @param {string} toolId Die ID des zu aktivierenden Tools (z.B. 'isochrone-controls').
  */
 function setActiveTool(toolId) {
     const isAlreadyActive = (toolId === activeToolId);
     
-    // Deaktiviere alle Toolbar-Buttons (visuelles Feedback)
     document.querySelectorAll('.toolbar-btn').forEach(btn => {
         btn.classList.remove('active');
     });
     
-    // Verstecke alle Tool-Sektionen im linken Panel
     document.querySelectorAll('.tool-section').forEach(el => {
         el.classList.add('hidden');
     });
 
     if (isAlreadyActive) {
-        // Tool war bereits aktiv -> Deaktivieren, Status zurücksetzen und Panel schließen
         activeToolId = null;
         if (!$('#main-wrap').classList.contains('left-collapsed')) {
-             $('#toggle-left-panel').click(); // Simuliert Klick, um Panel zu schließen
+             $('#toggle-left-panel').click(); 
         }
     } else {
-        // Neues Tool aktivieren
         activeToolId = toolId;
-
-        // Zeige das neue aktive Tool-Element an
         const targetElement = $(`#${toolId}`);
         if (targetElement) {
             targetElement.classList.remove('hidden');
         }
-        
-        // Aktiviere den entsprechenden Toolbar-Button (visuelles Feedback)
         const targetButton = $(`[data-target="${toolId}"]`);
         if (targetButton) {
             targetButton.classList.add('active');
         }
-        
-        // Panel links öffnen, falls es geschlossen ist
         if ($('#main-wrap').classList.contains('left-collapsed')) {
-             $('#toggle-left-panel').click(); // Simuliert Klick, um Panel zu öffnen
+             $('#toggle-left-panel').click();
         }
     }
 }
 
 // Initialisiert den Isochronen-Layer und die Event-Handler
 function initIsochroneFunctionality(baseMaps) {
-    // Erstellt den GeoJSON-Layer für die Isochrone mit Styling und Popup-Funktionalität
     isochroneLayer = L.geoJSON(null, {
         style: {
-            color: '#FF4500', // Farbe der Kontur
-            weight: 3, // Dicke der Kontur
-            opacity: 0.7,
-            fillColor: '#FF6347', // Füllfarbe
-            fillOpacity: 0.2
+            color: '#FF4500', weight: 3, opacity: 0.7, fillColor: '#FF6347', fillOpacity: 0.2
         },
-        // Definiert, was bei Klick auf ein Isochronen-Polygon im Popup angezeigt wird
         onEachFeature: (f, l) => {
             const minutes = selectedRange / 60;
             const profileText = $('#orsProfileSelect').options[$('#orsProfileSelect').selectedIndex].text.trim();
             l.bindPopup(`<b>${minutes} Minuten (${profileText})</b>`);
         }
-    }).addTo(map); // Fügt den Isochronen-Layer zur Karte hinzu
+    }).addTo(map);
     
-    // Fügt Marker-Gruppe (Startpunkte) zur Karte hinzu
     clickMarkers.addTo(map);
-
     cityLayer.addTo(map);
 
-    // Click-Handler für die Karte, um den Ausgangspunkt zu setzen (aktiviert nur, wenn Zeit gewählt)
     map.on('click', onMapClickForIsochrone);
     
-    // Event Listener für die Range-Buttons (Zeitwahl für Isochrone)
     document.querySelectorAll('.ors-range-btn').forEach(button => {
         button.addEventListener('click', function() {
-            // Deaktiviert alle anderen Buttons und aktiviert diesen (visuelles Feedback)
             document.querySelectorAll('.ors-range-btn').forEach(btn => btn.classList.remove('active'));
             this.classList.add('active');
             
-            selectedRange = parseInt(this.dataset.range); // Speichert die gewählte Zeit in Sekunden
+            selectedRange = parseInt(this.dataset.range);
             
-            // Aktualisiert den Status und Buttons basierend auf der Auswahl und gesetzten Punkten
             if (clickMarkers.getLayers().length > 0) {
                  $('#calculateIsochroneBtn').disabled = false;
                  $('#clearIsochroneBtn').disabled = false;
@@ -137,31 +114,26 @@ function initIsochroneFunctionality(baseMaps) {
         });
     });
 
-    // Event Listener für das Profil-Dropdown (ORS-Verkehrsmittel)
     $('#orsProfileSelect').addEventListener('change', () => {
-        // Status und Layer-Popup neu setzen (Isochrone muss neu berechnet werden)
-        clearIsochrone(); // Löscht bestehende Isochrone und Marker
+        clearIsochrone();
         const profileText = $('#orsProfileSelect').options[$('#orsProfileSelect').selectedIndex].text.trim();
         $('#isochrone-status').textContent = `Profil (${profileText}) gewählt. Bitte neue Zeit wählen.`;
         
-        // Alle Zeit-Buttons deaktivieren, bis eine neue Zeit gewählt wird
         document.querySelectorAll('.ors-range-btn').forEach(btn => btn.classList.remove('active'));
-        selectedRange = 0; // Setzt die gewählte Zeit zurück
+        selectedRange = 0;
     });
 
-    // Event Listener für Berechnen und Löschen-Buttons
-    $('#calculateIsochroneBtn').addEventListener('click', fetchIsochrone); // Startet die API-Anfrage
-    $('#clearIsochroneBtn').addEventListener('click', clearIsochrone); // Löscht Marker und Isochrone
+    $('#calculateIsochroneBtn').addEventListener('click', fetchIsochrone);
+    $('#clearIsochroneBtn').addEventListener('click', clearIsochrone);
 }
 
 // Löscht alle Isochronen-Marker und das Polygon-Ergebnis
 function clearIsochrone() {
-    clickMarkers.clearLayers(); // Entfernt alle Startpunkte-Marker
-    isochroneLayer.clearLayers(); // Entfernt das Isochronen-Polygon
-    $('#calculateIsochroneBtn').disabled = true; // Deaktiviert den Berechnen-Button
-    $('#clearIsochroneBtn').disabled = true; // Deaktiviert den Löschen-Button
+    clickMarkers.clearLayers();
+    isochroneLayer.clearLayers();
+    $('#calculateIsochroneBtn').disabled = true;
+    $('#clearIsochroneBtn').disabled = true;
     
-    // Setzt Status basierend auf der aktuellen Auswahl
     const activeBtn = document.querySelector('.ors-range-btn.active');
     const profileText = $('#orsProfileSelect').options[$('#orsProfileSelect').selectedIndex].text.trim();
 
@@ -171,7 +143,7 @@ function clearIsochrone() {
         $('#isochrone-status').textContent = `Profil (${profileText}) gewählt. Bitte wählen Sie eine Zeit aus.`;
     }
     
-    $('#calcIcon').innerHTML = ''; // Entfernt den Lade-Spinner, falls vorhanden
+    $('#calcIcon').innerHTML = '';
 }
 
 /**
@@ -180,70 +152,67 @@ function clearIsochrone() {
  */
 function resetSystemView() {
     // 1. Karten-Layer und Marker löschen
-    layer.clearLayers(); // Löscht Stations-Layer
-    flexzoneLayer.clearLayers(); // Löscht Flexzonen
-    businessAreaLayer.clearLayers(); // Löscht Business Areas
-    isochroneLayer.clearLayers(); // Löscht Isochrone
-    clickMarkers.clearLayers(); // Löscht Isochronen-Startpunkte
+    layer.clearLayers(); 
+    flexzoneLayer.clearLayers();
+    businessAreaLayer.clearLayers();
+    isochroneLayer.clearLayers();
+    clickMarkers.clearLayers();
     
     // 2. Globale Variablen zurücksetzen
-    selectedBrandDomain = null; // Kein System mehr ausgewählt
-    currentGeoJSON = null; // Kein Stations-GeoJSON mehr geladen
+    selectedBrandDomain = null;
+    currentGeoJSON = null;
     
     // 3. UI-Elemente zurücksetzen
-    $('#countrySelect').value = ''; // Land zurücksetzen
-    $('#brandInput').value = ''; // Suchfeld zurücksetzen
-    $('#citySelect').innerHTML = '<option value="">Alle Städte im System</option>'; // Städte-Dropdown zurücksetzen
+    $('#countrySelect').value = '';
+    $('#brandInput').value = ''; // KORRIGIERT: Autocomplete Input löschen
+    $('#brandSelect').value = ''; 
+    $('#citySelect').innerHTML = '<option value="">Alle Städte im System</option>';
     $('#citySelect').disabled = true;
-    $('#quickFilter').value = ''; // Schnellsuchfilter zurücksetzen
+    $('#quickFilter').value = '';
     $('#load-status').textContent = 'Bitte Auswahl treffen.';
     $('#geojson-output').value = '';
     $('#flexzone-toggle-container').classList.add('hidden');
     $('#geojsonBtn').disabled = true;
     $('#zipBtn').disabled = true;
+    
+    // NEU: Setze das Tool-Panel auf den Standard (Daten/Filter) zurück und klappe es ggf. aus
+    setActiveTool('filter-controls'); 
 
     // 4. City-Marker (alle) wieder anzeigen und auf ihre Bounds zoomen
     cityLayer.eachLayer(marker => {
-        // Stellt sicher, dass alle City-Marker wieder sichtbar sind
         if (marker.getElement()) {
             marker.getElement().style.display = '';
         }
     });
 
-    // Zoomt auf die Ausdehnung aller Stadt-Marker
     if (cityLayer.getLayers().length > 0) {
         map.fitBounds(cityLayer.getBounds(), {padding: [50, 50]});
     } else {
-        // Fallback-Ansicht, falls keine City-Marker vorhanden sind
-        map.setView([51.1657, 10.4515], 6); // Setzt auf Standardansicht Deutschland
+        map.setView([51.1657, 10.4515], 6);
     }
 }
 
 // Behandelt Karten-Klicks für den Isochronen-Startpunkt
 function onMapClickForIsochrone(e) {
-    if (activeToolId !== 'isochrone-controls') return; // Funktion nur ausführen, wenn das Isochronen-Tool aktiv ist
+    if (activeToolId !== 'isochrone-controls') return;
     
     if (selectedRange === 0) {
-        alert("Bitte wählen Sie zuerst eine Fahrzeit (z.B. 15 min) aus."); // Warnt, wenn keine Zeit gewählt wurde
+        alert("Bitte wählen Sie zuerst eine Fahrzeit (z.B. 15 min) aus.");
         return;
     }
     
-    // Max. 5 Locations pro ORS-Anfrage (Limit der ORS API)
     if (clickMarkers.getLayers().length >= 5) {
         alert("Sie können maximal 5 Startpunkte gleichzeitig setzen.");
         return;
     }
     
-    const latlng = e.latlng; // Breitengrad- und Längengrad-Objekt vom Klick-Ereignis
+    const latlng = e.latlng;
     
-    // Setzt neuen Marker an der Klickposition
     const newMarker = L.marker(latlng, { icon: markerIcon }).addTo(clickMarkers);
     
     const count = clickMarkers.getLayers().length;
-    // Bindet ein Popup an den Marker
     newMarker.bindPopup(`Startpunkt ${count}: ${latlng.lat.toFixed(4)}, ${latlng.lng.toFixed(4)}`).openPopup();
     
-    // Status in der UI aktualisieren und Berechnen-Button aktivieren
     const rangeText = document.querySelector('.ors-range-btn.active')?.textContent || 'Zeit gewählt';
     const profileText = $('#orsProfileSelect').options[$('#orsProfileSelect').selectedIndex].text.trim();
     $('#isochrone-status').textContent = `${profileText}, ${rangeText}. ${count} Punkt(e) gesetzt. Berechnen drücken.`;
@@ -257,10 +226,9 @@ async function fetchIsochrone() {
     const calculateBtn = $('#calculateIsochroneBtn');
     
     const locations = [];
-    // Extrahiert die Koordinaten aller gesetzten Marker
     clickMarkers.eachLayer(marker => {
         const latlng = marker.getLatLng();
-        locations.push([latlng.lng, latlng.lat]); // ORS erwartet [lon, lat] (umgekehrte Reihenfolge)
+        locations.push([latlng.lng, latlng.lat]);
     });
     
     if (locations.length === 0) {
@@ -268,52 +236,42 @@ async function fetchIsochrone() {
         return;
     }
 
-    const profile = $('#orsProfileSelect').value; // Abrufen des gewählten Verkehrsprofils (z.B. 'cycling-regular')
+    const profile = $('#orsProfileSelect').value;
     const profileText = $('#orsProfileSelect').options[$('#orsProfileSelect').selectedIndex].text.trim();
 
-    // UI Feedback starten (Button deaktivieren, Spinner anzeigen)
     calculateBtn.disabled = true;
     $('#calcIcon').innerHTML = '<span class="spinner"></span>';
     const rangeText = document.querySelector('.ors-range-btn.active')?.textContent || (selectedRange / 60) + ' Min.';
     statusDiv.textContent = `Berechne ${profileText}, ${rangeText} für ${locations.length} Punkt(e)...`;
-    isochroneLayer.clearLayers(); // Löscht vorherige Ergebnisse
+    isochroneLayer.clearLayers();
 
-    // Request-Body für die ORS API
     const requestBody = {
-        locations: locations, // Startkoordinaten
-        range: [selectedRange], // Reichweite in Sekunden
-        range_type: 'time', // Art der Reichweite (Zeit)
-        attributes: ['area', 'reachfactor'], // Zusätzliche gewünschte Attribute
-        // smoothing: 5 // Optional: Glättung des Isochronen-Polygons
+        locations: locations,
+        range: [selectedRange],
+        range_type: 'time',
+        attributes: ['area', 'reachfactor'],
     };
 
     try {
-        // Der ORS Endpunkt MUSS das Profil enthalten (z.B. .../isochrones/cycling-regular)
-        const dynamicEndpoint = `${ORS_BASE_ENDPOINT}${profile}`; 
-
-        // API-Schlüssel kodieren und als URL-Parameter übergeben
+        const dynamicEndpoint = `${ORS_BASE_ENDPOINT}${profile}`;
         const encodedApiKey = encodeURIComponent(ORS_API_KEY);
         const orsUrlWithKey = `${dynamicEndpoint}?api_key=${encodedApiKey}`;
-
-        // Leitet die vollständige URL durch den CORS-Proxy
-        const urlWithProxy = `${corsProxy}${orsUrlWithKey}`; 
+        const urlWithProxy = `${corsProxy}${orsUrlWithKey}`;
         
-        // Führt den POST-Request an die ORS API über den Proxy durch
         const resp = await fetch(urlWithProxy, { 
             method: 'POST',
             headers: {
                 'Accept': 'application/json, application/geo+json, application/gpx+xml, img/png; charset=utf-8',
                 'Content-Type': 'application/json; charset=utf-8'
             },
-            body: JSON.stringify(requestBody) // Sendet die Konfiguration als JSON
+            body: JSON.stringify(requestBody)
         });
 
-        // Fehlerbehandlung bei HTTP-Fehlern
         if (!resp.ok) {
             const errorText = await resp.text();
             let errorMessage = `ORS API HTTP Fehler: ${resp.status}`;
             try {
-                const errorData = JSON.parse(errorText); // Versucht, detaillierte Fehlermeldung zu parsen
+                const errorData = JSON.parse(errorText);
                 errorMessage = `ORS API Fehler: ${errorData.error.message || errorData.error.info || 'Unbekannt'}`;
             } catch {
                 errorMessage = `ORS API Fehler: ${resp.status} - ${errorText.substring(0, 100)}...`;
@@ -321,54 +279,33 @@ async function fetchIsochrone() {
             throw new Error(errorMessage);
         }
         
-        const geojson = await resp.json(); // Erwartet GeoJSON-Antwort
+        const geojson = await resp.json();
         
-        isochroneLayer.addData(geojson); // Fügt das erhaltene GeoJSON-Polygon dem Layer hinzu
+        isochroneLayer.addData(geojson);
         
-        statusDiv.textContent = `${profileText}, ${rangeText} erfolgreich geladen für ${locations.length} Punkt(e).`; // Erfolgsmeldung
+        statusDiv.textContent = `${profileText}, ${rangeText} erfolgreich geladen für ${locations.length} Punkt(e).`;
         
     } catch (e) {
         console.error("Fehler beim Abrufen der Isochrone:", e);
-        statusDiv.textContent = 'Fehler beim Laden der Isochrone: ' + e.message; // Fehlermeldung
+        statusDiv.textContent = 'Fehler beim Laden der Isochrone: ' + e.message;
     }
     finally {
-        calculateBtn.disabled = false; // Button wieder aktivieren
-        $('#calcIcon').innerHTML = ''; // Spinner entfernen
+        calculateBtn.disabled = false;
+        $('#calcIcon').innerHTML = '';
     }
 }
 
 // Initialisiert die Leaflet-Karte und die Basis-Layer
 function initMap(){
-    // --- Basemap-Definitionen ---
-    const osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        maxZoom: 19,
-        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-    });
-    const positron = L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
-        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
-        subdomains: 'abcd',
-        maxZoom: 20
-    });
-    const satellite = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
-        attribution: 'Tiles &copy; Esri'
-    });
-    const baseMaps = { // Objekt mit allen verfügbaren Basemaps
-        "OSM Standard": osm,
-        "Positron": positron,
-        "Satellit (Esri)": satellite
-    };
+    const osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors' });
+    const positron = L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', { attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>', subdomains: 'abcd', maxZoom: 20 });
+    const satellite = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { attribution: 'Tiles &copy; Esri' });
+    const baseMaps = { "OSM Standard": osm, "Positron": positron, "Satellit (Esri)": satellite };
 
-    // Initialisierung der Karte mit Positron als Standard-Basemap
-    map = L.map('map', { 
-        layers: [positron],
-        zoomControl: true // Zoom Control ist wieder an
-    }); 
+    map = L.map('map', { layers: [positron], zoomControl: true }); 
     
-    // --- Layer für die Daten (Nextbike Stationen) ---
     layer = L.geoJSON(null, {
-        // Funktion zum Erstellen der Marker mit dem nextbikeIcon
         pointToLayer: (feature, latlng) => L.marker(latlng, {icon: nextbikeIcon}),
-        // Funktion zum Binden von Popups an jeden Marker
         onEachFeature: (f, l) => {
             const p = f.properties || {};
             l.bindPopup(`<strong>${p.name||'Station'}</strong><br>`+
@@ -378,60 +315,38 @@ function initMap(){
         }
     });
     
-    // --- Layer für Flexzonen ---
     flexzoneLayer = L.geoJSON(null, {
-        // Funktion zum Stylen der Flexzonen basierend auf der Kategorie
         style: function(feature) {
             const category = feature.properties.category;
-            if (category === 'free_return') {
-                return { color: '#000000', weight: 1, opacity: 1, fillColor: '#000000', fillOpacity: 0.2 };
-            }
-            if (category === 'chargeable_return') {
-                return { color: '#FFA500', weight: 1, opacity: 1, fillColor: '#FFFF00', fillOpacity: 0.25 };
-            }
-            return { color: "#0098FF", weight: 2, opacity: 0.8, fillColor: "#0098FF", fillOpacity: 0.2 }; // Standard-Stil
+            if (category === 'free_return') { return { color: '#000000', weight: 1, opacity: 1, fillColor: '#000000', fillOpacity: 0.2 }; }
+            if (category === 'chargeable_return') { return { color: '#FFA500', weight: 1, opacity: 1, fillColor: '#FFFF00', fillOpacity: 0.25 }; }
+            return { color: "#0098FF", weight: 2, opacity: 0.8, fillColor: "#0098FF", fillOpacity: 0.2 };
         },
         onEachFeature: (f, l) => {
-            if(f.properties.name) l.bindPopup(`<b>${f.properties.name}</b>`); // Popup mit Namen
+            if(f.properties.name) l.bindPopup(`<b>${f.properties.name}</b>`);
         }
     });
 
-    // --- Layer für Business Areas ---
     businessAreaLayer = L.geoJSON(null, {
-        // Standard-Styling für Business Areas
-        style: function(feature) {
-            return { color: "#FF0000", weight: 2, opacity: 0.9, fillColor: "#FF69B4", fillOpacity: 0.2 };
-        },
-        onEachFeature: (f, l) => {
-            if(f.properties.name)  {
-                l.bindPopup(`<b>Business Area: ${f.properties.name}</b>`); // Popup mit Namen
-            }
-        }
+        style: function(feature) { return { color: "#FF0000", weight: 2, opacity: 0.9, fillColor: "#FF69B4", fillOpacity: 0.2 }; },
+        onEachFeature: (f, l) => { if(f.properties.name)  { l.bindPopup(`<b>Business Area: ${f.properties.name}</b>`); } }
     });
 
-    // Layer zur Karte hinzufügen (sichtbar machen)
     layer.addTo(map);
-    // Bedient das anfängliche Sichtbarkeits-Setting der Checkboxen
-    if ($('#flexzonesCheckbox').checked) {
-        flexzoneLayer.addTo(map);
-    }
-    if ($('#businessAreasCheckbox') && $('#businessAreasCheckbox').checked) {
-        businessAreaLayer.addTo(map);
-    }
+    if ($('#flexzonesCheckbox').checked) { flexzoneLayer.addTo(map); }
+    if ($('#businessAreasCheckbox') && $('#businessAreasCheckbox').checked) { businessAreaLayer.addTo(map); }
     
-    // Setzt die anfängliche Kartenansicht auf Deutschland (ungefähr)
     map.setView([51.1657, 10.4515], 6);
     
-    // Zentralisierte Initialisierung der Isochronen-Funktionalität UND Layer-Kontrolle
     initIsochroneFunctionality(baseMaps);
 
     mapLayersControl = L.control.layers(baseMaps, { 
-        "Stationen": layer, // Nextbike-Stationen
-        "Flexzonen": flexzoneLayer, // Flexzonen
-        "Business Areas": businessAreaLayer, // Business Areas
-        "ORS Isochrone": isochroneLayer, // Isochrone-Ergebnis
-        "Startpunkte": clickMarkers, // Isochronen-Startpunkte
-        "Nextbike Städte": cityLayer // Städte des ausgewählten Nextbike-Systems
+        "Stationen": layer,
+        "Flexzonen": flexzoneLayer,
+        "Business Areas": businessAreaLayer,
+        "ORS Isochrone": isochroneLayer,
+        "Startpunkte": clickMarkers,
+        "Nextbike Städte": cityLayer
     }).addTo(map);
 }
 
@@ -440,51 +355,42 @@ function option(value, label){ const o = document.createElement('option'); o.val
 
 // Verarbeitet die rohen Länderdaten und entfernt Duplikate
 function dedupeCountries(countriesIn){
-    const mapC = new Map(); // Verwendet eine Map zur Duplikatsprüfung basierend auf dem Ländercode
+    const mapC = new Map();
     countriesIn.forEach(c => {
         const code = (c.country || c.country_code || '').toUpperCase();
         const name = c.country_name || '';
         if(name && code && !mapC.has(code)) mapC.set(code, { country_code: code, country_name: name });
     });
     let arr = Array.from(mapC.values());
-    // Sortiert die Länderliste, Deutschland zuerst
     arr.sort((a,b) => (a.country_name==='Germany' ? -1 : b.country_name==='Germany' ? 1 : (a.country_name||'').localeCompare(b.country_name||'')));
     return arr;
 }
 
 // Erstellt eine Liste eindeutiger Marken/Systeme aus den Länderdaten
 function buildBrands(dataCountries) {
-    const mapB = new Map(); // Verwendet Map zur Speicherung eindeutiger Domänen
+    const mapB = new Map();
     dataCountries.forEach(topLevelObject => {
         const geo_country_code = (topLevelObject.country || '').toUpperCase();
-        // Hilfsfunktion zum Verarbeiten eines Marken-/Systemobjekts
         const processEntity = (entity, nameFallback) => {
-            const domain = (entity.domain || '').toLowerCase(); // Eindeutige Domäne/Schlüssel
+            const domain = (entity.domain || '').toLowerCase();
             if (!domain) return;
             const name = entity.name || entity.alias || nameFallback || `System ${domain}`;
-            if (!mapB.has(domain)) {
-                // Neues System gefunden
-                mapB.set(domain, { key: domain, domain, name, country_codes: new Set() });
-            }
-            // Fügt den Ländercode dem Set hinzu (um Duplikate zu vermeiden)
+            if (!mapB.has(domain)) { mapB.set(domain, { key: domain, domain, name, country_codes: new Set() }); }
             if (geo_country_code) mapB.get(domain).country_codes.add(geo_country_code);
         };
-        processEntity(topLevelObject); // Verarbeitet Top-Level-Länderobjekt
-        if (topLevelObject.cities) {
-            // Verarbeitet auch Domänen in den Stadt-Objekten
-            topLevelObject.cities.forEach(city => processEntity(city, city.city));
-        }
+        processEntity(topLevelObject);
+        if (topLevelObject.cities) { topLevelObject.cities.forEach(city => processEntity(city, city.city)); }
     });
-    // Konvertiert Map-Werte in Array und sortiert nach Namen
     return Array.from(mapB.values()).sort((a, b) => (a.name || '').localeCompare(b.name || ''));
 }
 
 // Lädt die Listen der verfügbaren Länder und Nextbike-Systeme von der API
+// Lädt die Listen der verfüfbaren Länder und Nextbike-Systeme von der API
 async function loadLists(){
     $('#load-status').style.visibility = 'visible';
     $('#load-status').textContent = 'Systeme werden geladen...';
     try{
-        // API-Endpunkt zum Abrufen aller Städte/Länder/Domänen
+        // ... (API-Aufruf zum Laden der Daten) ...
         const url = `${corsProxy}https://maps.nextbike.net/maps/nextbike-official.json?list_cities=1&bikes=0`;
         const resp = await fetch(url, { cache: 'no-store' });
         if(!resp.ok) throw new Error(`HTTP ${resp.status}`);
@@ -500,10 +406,13 @@ async function loadLists(){
         cSel.appendChild(option('', 'Alle Länder'));
         countryList.forEach(c => cSel.appendChild(option(c.country_code, `${c.country_name} (${c.country_code})`)));
         
-        updateAvailableBrands(); // Aktualisiert die verfügbaren Marken (relevant für die Suche)
+        // **WICHTIG:** drawAllCityMarkers MUSS nach loadLists laufen
+        drawAllCityMarkers(); // <-- Zeichnet die Marker mit dem NEUEN Klick-Handler
+        
+        updateAvailableBrands(); // <-- Füllt jetzt das #brandSelect Dropdown
+        
         $('#load-status').textContent = 'Bitte Auswahl treffen.';
         
-        drawAllCityMarkers(); // Zeichnet alle Städte-Marker auf der Karte
         loadAllFlexzones(); // Startet das Laden aller Flexzonen-Daten im Hintergrund
         loadAllBusinessAreas(); // Startet das Laden aller Business Area-Daten im Hintergrund
     }catch(e){
@@ -522,7 +431,6 @@ async function loadAllFlexzones() {
             throw new Error(`Flexzonen-API HTTP ${flexzoneResp.status}`);
         }
         const flexzoneData = await flexzoneResp.json();
-        // Navigiert durch die möglichen JSON-Strukturen, um die Features zu extrahieren
         if (flexzoneData.geojson && flexzoneData.geojson.nodeValue && flexzoneData.geojson.nodeValue.features) {
             allFlexzones = flexzoneData.geojson.nodeValue.features;
         } else if (flexzoneData.geojson && flexzoneData.geojson.features) {
@@ -540,7 +448,6 @@ async function loadAllFlexzones() {
 // Lädt alle Business Area GeoJSON-Daten von der Nextbike API
 async function loadAllBusinessAreas() {
     try {
-        // Spezieller API-Aufruf mit categories=business_area
         const businessAreaResp = await fetch(`${corsProxy}https://api.nextbike.net/api/v1.1/getFlexzones.json?api_key=API_KEY_GELOESCHT&categories=business_area`);
         if (!businessAreaResp.ok) {
             const errorText = await businessAreaResp.text();
@@ -548,7 +455,6 @@ async function loadAllBusinessAreas() {
             throw new Error(`BusinessArea-API HTTP ${businessAreaResp.status}`);
         }
         const businessAreaData = await businessAreaResp.json();
-        // Navigiert durch die möglichen JSON-Strukturen, um die Features zu extrahieren
         if (businessAreaData.geojson && businessAreaData.geojson.nodeValue && businessAreaData.geojson.nodeValue.features) {
             allBusinessAreas = businessAreaData.geojson.nodeValue.features;
         } else if (businessAreaData.geojson && businessAreaData.geojson.features) {
@@ -563,41 +469,30 @@ async function loadAllBusinessAreas() {
     }
 }
 
-// Aktualisiert die Liste der verfügbaren Marken basierend auf der Länderauswahl
+// Aktualisiert die Anzeige (nur noch Filterung der City-Marker) nach Länderwahl
 function updateAvailableBrands(){
-    const countryCode = ($('#countrySelect').value || '').toUpperCase();
-    const brandInput = $('#brandInput');
+    $('#brandInput').value = ''; // Leert das Autocomplete-Feld bei Länderwechsel
+    $('#brandSelect').value = ''; // Leert den versteckten Wert
+    selectedBrandDomain = null; 
     
-    // Filtert die Markenliste nach dem gewählten Land
-    availableBrands = brandList.filter(b => !countryCode || b.country_codes.has(countryCode));
-    
-    // Setzt die Eingabe und den ausgewählten Brand/Domain zurück
-    brandInput.value = '';
-    selectedBrandDomain = null;
-    brandInput.disabled = false;
-    brandInput.placeholder = `${availableBrands.length} Marken/Systeme verfügbar...`;
-    
-    $('#flexzone-toggle-container').classList.add('hidden'); // Versteckt die Flexzonen-Umschaltung
-    refreshCitySelect(); // Aktualisiert das Städte-Dropdown
+    $('#flexzone-toggle-container').classList.add('hidden');
+    refreshCitySelect(); // Löst das Filtern der City-Marker und das Füllen des Städte-Dropdowns aus
 }
 
-// Ruft die Städte für eine spezifische Nextbike-Domäne ab
-function fetchCitiesForBrand(domain) { 
+// Ruft die Städte für eine spezifische Nextbike-Domäne ODER das Land ab
+function fetchCitiesForBrand(domain, countryCode) { 
     const out = [];
 
-    // Iteriere durch die global geladenen Rohdaten: rawCountries
     rawCountries.forEach(co => {
         const cc = (co.country || co.country_code || '').toUpperCase();
-        // Hole die Domäne des Top-Level-Objekts (Land/Hauptsystem)
         const countryDomain = (co.domain || '').toLowerCase(); 
 
+        if (countryCode && cc !== countryCode) return;
+
         co.cities?.forEach(city => {
-            // Hole die Domäne des Stadt-Objekts
             const cityDomain = (city.domain || '').toLowerCase(); 
 
-            // Prüft: 1. Ist die gesuchte Domain gleich der Domain des Landes ODER der Stadt? 
-            //        2. Hat die Stadt Koordinaten?
-            if ((cityDomain === domain.toLowerCase() || countryDomain === domain.toLowerCase()) && 
+            if ((!domain || cityDomain === domain.toLowerCase() || countryDomain === domain.toLowerCase()) && 
                  typeof city.lat === 'number' && typeof city.lng === 'number') {
                 out.push({ 
                     uid: city.uid, 
@@ -609,14 +504,9 @@ function fetchCitiesForBrand(domain) {
             }
         });
     });
-    // Entfernt Duplikate nach der UID und gibt die Liste zurück
     return [...new Map(out.map(item => [item.uid, item])).values()];
 }
 
-/**
- * Zeichnet alle verfügbaren Nextbike-Städte auf der Karte und zoomt auf deren Ausdehnung.
- */
-// Funktion drawAllCityMarkers (Komplett ersetzen)
 /**
  * Zeichnet alle verfügbaren Nextbike-Städte auf der Karte, bindet den Klick-Handler zum Laden des Systems
  * und zoomt auf deren gesamte Ausdehnung.
@@ -625,7 +515,6 @@ function drawAllCityMarkers() {
     cityLayer.clearLayers();
     const out = [];
 
-    // Sammelt alle Städte aus rawCountries
     rawCountries.forEach(co => {
         const cc = (co.country || co.country_code || '').toUpperCase();
         const countryDomain = (co.domain || '').toLowerCase(); 
@@ -633,7 +522,6 @@ function drawAllCityMarkers() {
         co.cities?.forEach(city => {
             const cityDomain = (city.domain || '').toLowerCase(); 
 
-            // Wichtig: Nur Städte mit Koordinaten einschließen
             if (typeof city.lat === 'number' && typeof city.lng === 'number') {
                 out.push({ 
                     uid: city.uid, 
@@ -651,23 +539,39 @@ function drawAllCityMarkers() {
     out.forEach(city => {
         const marker = L.marker([city.lat, city.lng], { 
             icon: cityIcon,
-            _domain: city.domain // Speichert die Domain für refreshCitySelect zur Filterung
+            _domain: city.domain,
+            feature: { 
+                properties: { 
+                    country_code: city.country_code,
+                    domain: city.domain
+                } 
+            }
         });
         
-        // Klick-Handler: Löst den Ladevorgang aus
+        // KORRIGIERT: Klick-Handler: Löst den Ladevorgang aus, indem das Marken-Dropdown aktualisiert wird
         marker.on('click', function() {
-            // 1. Speichert die Domain und aktualisiert das Suchfeld
-            selectedBrandDomain = city.domain; 
-            $('#brandInput').value = city.name; 
+            const brandSelect = $('#brandSelect');
+            const brandInput = $('#brandInput'); // NEU: Referenz auf das sichtbare Input-Feld
             
-            // 2. Blendet Flexzonen-Toggle ein
-            $('#flexzone-toggle-container').classList.remove('hidden'); 
-
-            // 3. LÖST DEN ZOOMEFFEKT UND DAS LADEN AUS
-            loadData(); 
-
-            // 4. Blendet die NICHT ausgewählten City-Marker aus
-            refreshCitySelect();
+            // 1. Land auswählen, falls nicht schon gewählt
+            $('#countrySelect').value = city.country_code;
+            
+            // 2. Marke/System im versteckten Feld setzen
+            brandSelect.value = city.domain; 
+            
+            // NEU: Setze den Klartextnamen im sichtbaren Autocomplete-Feld
+            const selectedBrand = brandList.find(b => b.domain === city.domain);
+            if (selectedBrand) {
+                brandInput.value = selectedBrand.name;
+            } else {
+                 brandInput.value = city.domain; // Fallback, falls Name nicht gefunden
+            }
+            
+            // 3. Auslösen des Change-Events, um die gesamte Logik (Daten laden, Zoom) zu starten
+            brandSelect.dispatchEvent(new Event('change'));
+            
+            // NEU: Wir öffnen sofort das Daten-/Filter-Panel, um Konsistenz zu gewährleisten
+            setActiveTool('filter-controls');
         });
 
         const popupContent = `<b>${city.name}</b><br>System: ${city.domain || 'N/A'}<br>Land: ${city.country_code}`;
@@ -676,38 +580,47 @@ function drawAllCityMarkers() {
         cityLayer.addLayer(marker);
     });
     
-    // Zoomt auf die Ausdehnung aller Stadt-Marker beim INITIALEN LADEN
     if (cityLayer.getLayers().length > 0) {
         map.fitBounds(cityLayer.getBounds(), {padding: [50, 50]});
     }
 }
 
 
-// Aktualisiert das Städte-Dropdown, nachdem eine Marke ausgewählt oder das Land geändert wurde
 // Aktualisiert das Städte-Dropdown und filtert die Sichtbarkeit der Marker
 async function refreshCitySelect(){
     const brandKey = selectedBrandDomain;
+    const countryCode = ($('#countrySelect').value || '').toUpperCase();
     const citySel = $('#citySelect');
     
     // 1. Marker filtern: Zeige alle, wenn keine Marke gewählt, sonst nur die passenden.
     cityLayer.eachLayer(marker => {
-        // Nutzt das in drawAllCityMarkers zugewiesene options._domain Attribut
-        const domainMatch = !brandKey || marker.options._domain === brandKey; 
-        const displayStyle = domainMatch ? '' : 'none';
+        const markerDomain = marker.options._domain;
         
-        marker.getElement().style.display = displayStyle;
+        const domainMatch = !brandKey || markerDomain === brandKey;
+        
+        const markerCountryCode = marker.options.feature?.properties?.country_code || '';
+        const countryMatch = !countryCode || markerCountryCode === countryCode;
+        
+        const displayStyle = domainMatch && countryMatch ? '' : 'none';
+        
+        if (marker.getElement()) {
+            marker.getElement().style.display = displayStyle;
+        }
     });
 
     // 2. Dropdown zurücksetzen
     citySel.innerHTML = '<option value="">Alle Städte im System</option>';
     
-    if(!brandKey){ 
-        citySel.disabled = true; 
-        return; 
-    } 
+    // Wenn KEIN Land gewählt UND KEIN Brand, ist das Dropdown deaktiviert.
+    if (!countryCode && !brandKey) {
+        citySel.disabled = true; 
+        return; 
+    }
+    
     try{
-        // 3. Dropdown-Inhalte für die gewählte Marke laden
-        let items = await fetchCitiesForBrand(brandKey); 
+        // 3. Dropdown-Inhalte laden: Wenn BrandKey gewählt -> lade Städte für Brand. 
+        //                             Sonst (nur Land gewählt) -> lade Städte für Land.
+        let items = await fetchCitiesForBrand(brandKey, countryCode); 
         
         items.sort((a,b)=> (a.name||'').localeCompare(b.name||''));
         
@@ -733,9 +646,8 @@ function fcFromNextbike(json){
                 if(typeof place.lat !== 'number' || typeof place.lng !== 'number') return;
                 features.push({ 
                     type:'Feature', 
-                    // Geometrie im [lon, lat]-Format
                     geometry:{ type:'Point', coordinates:[place.lng, place.lat] }, 
-                    properties: { // Wichtige Stationsinformationen
+                    properties: {
                         station_id: String(place.number ?? place.uid ?? ''), name: place.name || '', address: place.address || '',
                         capacity: place.bike_racks ?? null, num_bikes_available: place.bikes ?? null, num_docks_available: place.free_racks ?? null,
                         city_uid: city.uid ?? null, city_name: city.name || city.city || city.alias || '', domain, country_name: country.country_name || ''
@@ -744,9 +656,10 @@ function fcFromNextbike(json){
             });
         });
     });
-    return { type:'FeatureCollection', features }; // Gibt die finale GeoJSON FeatureCollection zurück
+    return { type:'FeatureCollection', features };
 }
 
+// Lädt die Stationsdaten basierend auf der aktuellen Auswahl (Land/Marke/Stadt)
 // Lädt die Stationsdaten basierend auf der aktuellen Auswahl (Land/Marke/Stadt)
 async function loadData(){
     const loadBtn = $('#loadBtn');
@@ -758,6 +671,7 @@ async function loadData(){
         const domain = selectedBrandDomain, cityUid = $('#citySelect').value;
         const countryCode = ($('#countrySelect').value || '').toUpperCase();
         let baseUrl = 'https://maps.nextbike.net/maps/nextbike-official.json?bikes=0';
+
         // Baut die URL basierend auf der höchstspezifischen Auswahl
         if(cityUid) baseUrl += `&city=${cityUid}`;
         else if(domain) baseUrl += `&domains=${domain}`;
@@ -789,43 +703,54 @@ async function loadData(){
 
         // --- Flexzonen-Logik ---
         flexzoneLayer.clearLayers();
-        // Filtert und zeigt nur die Flexzonen für die aktuell ausgewählte Domäne an
         if ($('#flexzonesCheckbox').checked && allFlexzones.length > 0 && selectedBrandDomain) {
             const relevantFeatures = allFlexzones.filter(f => f.properties?.domain === selectedBrandDomain);
             if (relevantFeatures.length > 0) {
-                const flexzoneGeoJSON = {
-                    type: "FeatureCollection",
-                    features: relevantFeatures
-                };
+                const flexzoneGeoJSON = { type: "FeatureCollection", features: relevantFeatures };
                 flexzoneLayer.addData(flexzoneGeoJSON);
             }
         }
 
         // --- Business Area Logik ---
         businessAreaLayer.clearLayers();
-        // Filtert und zeigt nur die Business Areas für die Domäne an
         if ($('#businessAreasCheckbox').checked && allBusinessAreas.length > 0 && selectedBrandDomain) {
             const relevantBusinessAreas = allBusinessAreas.filter(f => f.properties?.domain === selectedBrandDomain);
             if (relevantBusinessAreas.length > 0) {
-                const businessAreaGeoJSON = {
-                    type: "FeatureCollection",
-                    features: relevantBusinessAreas
-                };
+                const businessAreaGeoJSON = { type: "FeatureCollection", features: relevantBusinessAreas };
                 businessAreaLayer.addData(businessAreaGeoJSON);
             }
         }
         
-        // Passt den Kartenausschnitt an die geladenen Daten an (Stationen, Flexzonen, Business Areas)
-        const combinedLayer = L.featureGroup([...layer.getLayers(), ...flexzoneLayer.getLayers(), ... cityLayer.getLayers(), ...businessAreaLayer.getLayers()]);
+        // START KORRIGIERTE ZOOM-LOGIK (Zur Behebung des "Kein Zoom"-Fehlers)
+        
+        // Erstellt eine FeatureGroup aus allen aktuell relevanten Layern für den Zoom
+        const combinedLayer = L.featureGroup([
+            ...layer.getLayers(), // Stations-Layer
+            ...flexzoneLayer.getLayers(), // Flexzonen
+            ...businessAreaLayer.getLayers() // Business Areas
+        ]);
+        
         if (combinedLayer.getLayers().length > 0) {
             const bounds = combinedLayer.getBounds();
+            
             if (bounds.isValid()) {
-                map.fitBounds(bounds, {padding: [50, 50]}); // Zoomt auf die Ausdehnung der Daten
-            }
+                // Zoomt auf die Ausdehnung der geladenen Daten (Stationen/Zonen)
+                map.fitBounds(bounds, {padding: [50, 50]});
+            } else {
+                 // Fallback: Wenn Bounds ungültig (z.B. nur ein Punkt/Marker geladen)
+                 if (fc.features.length > 0) {
+                     // Zoomt auf den ersten Punkt mit einem festen Zoomlevel (14)
+                     map.setView([fc.features[0].geometry.coordinates[1], fc.features[0].geometry.coordinates[0]], 14);
+                 } else {
+                     map.setView([51.1657, 10.4515], 6); // Standardansicht, wenn keine Daten da sind
+                 }
+            }
         } else {
-             map.setView([51.1657, 10.4515], 6); // Setzt auf Standardansicht zurück
+             map.setView([51.1657, 10.4515], 6); // Standardansicht, wenn keine Daten da sind
         }
-
+        
+        // ENDE KORRIGIERTE ZOOM-LOGIK
+        
     }catch(e){ 
         $('#load-status').textContent = 'Fehler: '+e.message; 
         $('#geojsonBtn').disabled = true;
@@ -839,17 +764,12 @@ async function loadData(){
 
 /**
  * Generiert einen Dateinamen basierend auf dem aktuellen Datum, der Uhrzeit und der Nextbike-Domäne.
- *
- * @param {string} cityAlias - Der 2-stellige Nextbike city/alias Parameter (z.B. "le", "dd").
+ * @param {string} cityAlias - Der 2-stellige Nextbike city/alias Parameter.
  * @returns {string} Der generierte Dateiname (ohne Dateiendung).
  */
 function generateFilename(cityAlias) {
-    if (!cityAlias) {
-        console.warn("City Alias ist nicht gesetzt, verwende Fallback für Dateinamen.");
-        cityAlias = "nextbike"; // Fallback, falls kein Alias ausgewählt ist
-    }
+    if (!cityAlias) { cityAlias = "nextbike"; }
     const now = new Date();
-    // Formatiert Datum und Uhrzeit
     const year = now.getFullYear();
     const month = (now.getMonth() + 1).toString().padStart(2, '0');
     const day = now.getDate().toString().padStart(2, '0');
@@ -857,7 +777,6 @@ function generateFilename(cityAlias) {
     const minutes = now.getMinutes().toString().padStart(2, '0');
     const seconds = now.getSeconds().toString().padStart(2, '0');
 
-    // Beispiel: "2023-10-27_14-35-00_le_stations"
     return `${year}-${month}-${day}_${hours}-${minutes}-${seconds}_${cityAlias}_stations`;
 }
 
@@ -865,55 +784,35 @@ function generateFilename(cityAlias) {
 async function downloadZip() {
     if (!currentGeoJSON) return;
 
-    const zip = new JSZip(); // Erstellt eine neue JSZip-Instanz
-    // Generiert den Basis-Dateinamen
+    const zip = new JSZip();
     const baseFilename = generateFilename(selectedBrandDomain);
     
-    // Stations-GeoJSON hinzufügen
     zip.file("stations.geojson", JSON.stringify(currentGeoJSON, null, 2));
 
-    const flexzoneGeoJSON = flexzoneLayer.toGeoJSON(); // Konvertiert Flexzonen-Layer in GeoJSON
-    
-    // Überprüft, ob Flexzonen-Features vorhanden sind
+    const flexzoneGeoJSON = flexzoneLayer.toGeoJSON();
     if (flexzoneGeoJSON.features.length > 0) {
-        // Die komplette Flexzonen-Datei hinzufügen
         zip.file("fullsystem_flexzones.geojson", JSON.stringify(flexzoneGeoJSON, null, 2));
-
-        // Jedes Flexzonen-Feature als separate Datei hinzufügen (zum besseren Import)
         flexzoneGeoJSON.features.forEach(feature => {
             const featureName = feature.properties.name;
-            // Erstellt einen gültigen, bereinigten Dateinamen
             const sanitizedName = featureName ? featureName.replace(/[\W_]+/g, "_") : 'unbenannte_flexzone';
-            
-            // Erstellt ein GeoJSON FeatureCollection-Objekt nur für dieses eine Feature
-            const singleFeatureGeoJSON = {
-                type: "FeatureCollection",
-                features: [feature]
-            };
-
-            // Fügt die Datei zum ZIP-Archiv hinzu
+            const singleFeatureGeoJSON = { type: "FeatureCollection", features: [feature] };
             zip.file(`${sanitizedName}.geojson`, JSON.stringify(singleFeatureGeoJSON, null, 2));
         });
     }
 
-    // --- Business Areas-Logik (analog zu Flexzonen) ---
     const businessAreaGeoJSON = businessAreaLayer.toGeoJSON();
     if (businessAreaGeoJSON.features.length > 0) {
         zip.file("fullsystem_business_areas.geojson", JSON.stringify(businessAreaGeoJSON, null, 2));
         businessAreaGeoJSON.features.forEach(feature => {
             const featureName = feature.properties.name;
             const sanitizedName = featureName ? featureName.replace(/[\W_]+/g, "_") : 'unbenannte_business_area';
-            const singleFeatureGeoJSON = {
-                type: "FeatureCollection",
-                features: [feature]
-            };
+            const singleFeatureGeoJSON = { type: "FeatureCollection", features: [feature] };
             zip.file(`businessarea_${sanitizedName}.geojson`, JSON.stringify(singleFeatureGeoJSON, null, 2));
         });
     }
 
-    // Generiert die ZIP-Datei und startet den Download
     const zipBlob = await zip.generateAsync({type:"blob"});
-    saveAs(zipBlob, baseFilename + ".zip"); // saveAs ist eine Funktion der library FileSaver.js
+    saveAs(zipBlob, baseFilename + ".zip");
 }
 
 // Richtet die Event Listener für das Ein- und Ausklappen der Sidebars ein
@@ -922,15 +821,12 @@ function setupSidebars() {
     const toggleLeftBtn = $('#toggle-left-panel');
     const toggleRightBtn = $('#toggle-right-panel');
 
-    // Event Listener für die linke Sidebar
     toggleLeftBtn.addEventListener('click', () => {
-        wrap.classList.toggle('left-collapsed'); // Schaltet die CSS-Klasse um
-        toggleLeftBtn.textContent = wrap.classList.contains('left-collapsed') ? '▶' : '◀'; // Ändert den Button-Text
-        // Verzögerte Größenanpassung der Karte nach dem Umklappen (Leaflet-Anforderung)
+        wrap.classList.toggle('left-collapsed');
+        toggleLeftBtn.textContent = wrap.classList.contains('left-collapsed') ? '▶' : '◀';
         setTimeout(() => map.invalidateSize({debounceMoveend: true}), 350); 
     });
 
-    // Event Listener für die rechte Sidebar (falls vorhanden)
     if (toggleRightBtn) {
         toggleRightBtn.addEventListener('click', () => {
             wrap.classList.toggle('right-collapsed');
@@ -939,83 +835,199 @@ function setupSidebars() {
         });
     }
 }
+/**
+ * Richtet die Autovervollständigung für die Markensuche ein.
+ * Verwendet brandInput und brandSelect (hidden input).
+ */
+function setupAutocomplete() {
+    const input = $('#brandInput');
+    const resultsDiv = $('#autocomplete-results');
+    const brandSelectHidden = $('#brandSelect');
+    let currentFocus = -1; // Index des aktuell fokussierten Elements
 
-// Richtet die Autovervollständigungs- und Suchfunktionen für Nextbike-Marken ein
+    // Setzt den ausgewählten Wert und löst das Change-Event aus
+    const selectItem = (domain, name) => {
+        input.value = name; 
+        brandSelectHidden.value = domain;
+        resultsDiv.innerHTML = '';
+        resultsDiv.style.display = 'none';
+        input.classList.remove('active-search');
+        
+        // Simuliere den Change-Event des alten Dropdowns, um die Lade-Logik zu triggern
+        brandSelectHidden.dispatchEvent(new Event('change'));
+    };
+
+    // Erzeugt die Autocomplete-Ergebnis-Liste
+    const renderResults = (arr) => {
+        resultsDiv.innerHTML = '';
+        resultsDiv.style.display = 'none';
+        currentFocus = -1;
+        
+        if (arr.length === 0) return;
+        
+        arr.slice(0, 10).forEach((item, index) => { // Zeige max. 10 Ergebnisse
+            const itemDiv = document.createElement('div');
+            itemDiv.classList.add('autocomplete-item');
+            
+            // Hebt den Suchbegriff hervor
+            const regex = new RegExp(input.value, 'gi');
+            const highlightedName = item.name.replace(regex, (match) => `<strong>${match}</strong>`);
+            
+            itemDiv.innerHTML = `${highlightedName} <small>${item.domain}</small>`;
+            itemDiv.dataset.domain = item.domain;
+            itemDiv.dataset.name = item.name;
+
+            itemDiv.addEventListener('click', () => {
+                selectItem(item.domain, item.name);
+            });
+            resultsDiv.appendChild(itemDiv);
+        });
+        
+        resultsDiv.style.display = 'block';
+        input.classList.add('active-search');
+    };
+    
+    // Tastatur-Navigation
+    const addActive = (x) => {
+        if (!x) return false;
+        removeActive(x);
+        if (currentFocus >= x.length) currentFocus = 0;
+        if (currentFocus < 0) currentFocus = (x.length - 1);
+        x[currentFocus].classList.add('active');
+        x[currentFocus].scrollIntoView({ block: "nearest" });
+    }
+    
+    const removeActive = (x) => {
+        for (let i = 0; i < x.length; i++) {
+            x[i].classList.remove('active');
+        }
+    }
+
+    // Input-Event: Filtert die Markenliste
+    input.addEventListener('input', function() {
+        const val = this.value.toLowerCase();
+        
+        if (!val) {
+            brandSelectHidden.value = ''; // Setze den Domain-Wert zurück
+            renderResults([]);
+            // Wenn das Suchfeld leer ist, zeige alle City-Marker an und zoome darauf
+            refreshCitySelect();
+            cityLayer.eachLayer(marker => { if (marker.getElement()) { marker.getElement().style.display = ''; } });
+            if (cityLayer.getLayers().length > 0) { map.fitBounds(cityLayer.getBounds(), {padding: [50, 50]}); }
+            return;
+        }
+
+        // Filtere basierend auf dem Suchtext
+        const countryCode = ($('#countrySelect').value || '').toLowerCase();
+        const filtered = brandList.filter(b => 
+            (!countryCode || b.country_codes.has(countryCode.toUpperCase())) &&
+            ((b.name || '').toLowerCase().includes(val) || (b.domain || '').toLowerCase().includes(val))
+        );
+        renderResults(filtered);
+    });
+
+    // Tastatur-Events (Pfeiltasten, Enter)
+    input.addEventListener('keydown', function(e) {
+        let x = resultsDiv.getElementsByClassName('autocomplete-item');
+        if (e.key === 'ArrowDown') {
+            currentFocus++;
+            addActive(x);
+        } else if (e.key === 'ArrowUp') {
+            currentFocus--;
+            addActive(x);
+        } else if (e.key === 'Enter') {
+            e.preventDefault();
+            if (currentFocus > -1) {
+                if (x) x[currentFocus].click();
+            } else if (x.length > 0) {
+                 // Wenn Enter gedrückt und kein Element ausgewählt, wähle das erste
+                 x[0].click();
+            }
+        }
+    });
+
+    // Klick außerhalb des Autocomplete-Felds schließt die Ergebnisse
+    document.addEventListener('click', (e) => {
+        if (!resultsDiv.contains(e.target) && e.target !== input) {
+            resultsDiv.innerHTML = '';
+            resultsDiv.style.display = 'none';
+            input.classList.remove('active-search');
+        }
+    });
+    
+    // Wenn das Eingabefeld den Fokus verliert und der Wert gesetzt ist,
+    // ersetze den Domain-Wert durch den Klartextnamen.
+    input.addEventListener('blur', () => {
+         const currentDomain = brandSelectHidden.value;
+         if (currentDomain) {
+             const selectedBrand = brandList.find(b => b.domain === currentDomain);
+             if (selectedBrand && input.value !== selectedBrand.name) {
+                 input.value = selectedBrand.name;
+             }
+         }
+    });
+
+}
+// Richtet die Logik für die Auswahl der Nextbike-Marken (Systeme) ein
+// Richtet die Logik für die Auswahl der Nextbike-Marken (Systeme) ein
 function setupBrandSearch() {
-    const brandInput = $('#brandInput');
-    const brandResults = $('#brandResults');
-    const countrySelect = $('#countrySelect');
-    const flexzoneToggle = $('#flexzone-toggle-container');
+    const brandSelectHidden = $('#brandSelect'); // Das HIDDEN-Feld
+    const countrySelect = $('#countrySelect');
+    const flexzoneToggle = $('#flexzone-toggle-container');
+    
+    // Event Listener für das Land-Dropdown
+    countrySelect.addEventListener('change', () => {
+        updateAvailableBrands();
+    });
 
-    // Hauptfunktion zur Filterung und Anzeige der Suchergebnisse
-    function filterAndDisplay() {
-        const query = brandInput.value.toLowerCase();
-        selectedBrandDomain = null; // Setze Domain zurück, wenn Input geändert wird
-        refreshCitySelect(); // Aktualisiert das Städte-Dropdown
-        flexzoneToggle.classList.add('hidden'); // Versteckt Flexzonen-Umschaltung
+    // Event Listener für das Marken/System-Feld (Jetzt ein verstecktes Feld, 
+    // das durch Autocomplete mit Werten gefüllt wird)
+    brandSelectHidden.addEventListener('change', () => {
+        const selectedDomain = brandSelectHidden.value;
+        
+        layer.clearLayers(); 
+        flexzoneLayer.clearLayers(); 
+        businessAreaLayer.clearLayers(); 
 
-        if (!query) {
-            brandResults.style.display = 'none'; // Versteckt Ergebnisse bei leerer Eingabe
-            return;
-        }
-        
-        let filtered = availableBrands;
-        // Filtert nach Land, falls ausgewählt
-        if (countrySelect.value) {
-            filtered = filtered.filter(s => s.country_codes.has(countrySelect.value.toUpperCase()));
-        }
-        
-        // Filtert nach eingegebenem Text in Name oder Domain
-        filtered = filtered.filter(s => s.name.toLowerCase().includes(query) || s.domain.toLowerCase().includes(query));
-        
-        brandResults.innerHTML = '';
-        if (filtered.length > 0) {
-            // Zeigt maximal 100 Ergebnisse an
-            filtered.slice(0, 100).forEach(system => {
-                const item = document.createElement('div');
-                item.className = 'autocomplete-item';
-                item.innerHTML = `${system.name} <small>(${system.domain})</small>`;
-                // Klick-Handler für ein Suchergebnis
-                item.addEventListener('click', () => {
-                    brandInput.value = system.name;
-                    selectedBrandDomain = system.key; // Setzt die ausgewählte Domäne
-                    brandResults.style.display = 'none';
-                    refreshCitySelect();
-                    flexzoneToggle.classList.remove('hidden'); // Zeigt Flexzonen-Umschaltung
-                });
-                brandResults.appendChild(item);
-            });
-            brandResults.style.display = 'block';
-        } else {
-            brandResults.style.display = 'none';
-        }
-    }
-    
-    // Event Listener für Eingabe im Suchfeld und Änderung der Länderauswahl
-    brandInput.addEventListener('input', filterAndDisplay);
-    countrySelect.addEventListener('change', () => {
-        brandInput.value = '';
-        updateAvailableBrands(); // Aktualisiert die verfügbare Markenliste
-    });
+        if (selectedDomain) {
+            selectedBrandDomain = selectedDomain; 
+            flexzoneToggle.classList.remove('hidden'); 
+            
+            loadData(); 
+            
+            refreshCitySelect(); 
+            
+            // Verstecke die City-Marker, sobald eine Brand gewählt ist
+            cityLayer.eachLayer(marker => { if (marker.getElement()) { marker.getElement().style.display = 'none'; } });
 
-    // Schließt die Autovervollständigung, wenn außerhalb geklickt wird
-    document.addEventListener('click', (e) => {
-        if (!$('.autocomplete-container').contains(e.target)) {
-            brandResults.style.display = 'none';
-        }
-    });
+        } else {
+            selectedBrandDomain = null;
+            flexzoneToggle.classList.add('hidden');
+            
+            refreshCitySelect(); 
+            
+            // Logik zum Zoomen auf sichtbare City-Marker (nur die des ausgewählten Landes)
+            const visibleLayers = cityLayer.getLayers().filter(marker => marker.getElement().style.display !== 'none');
+            const visibleLayerGroup = L.featureGroup(visibleLayers);
+
+            if (visibleLayerGroup.getLayers().length > 0) {
+                 map.fitBounds(visibleLayerGroup.getBounds(), {padding: [50, 50]});
+            } else {
+                 map.setView([51.1657, 10.4515], 6);
+            }
+        }
+    });
 }
 
 /**
  * Fügt Event Listener zur neuen Top-Toolbar hinzu (für die Tool-Auswahl)
  */
 function setupToolbar() {
-    // Fügt Event Listener zur neuen Top-Toolbar hinzu
     document.querySelectorAll('#top-toolbar .toolbar-btn').forEach(btn => {
         btn.addEventListener('click', (e) => {
             e.preventDefault();
-            const targetId = e.currentTarget.dataset.target; // Liest die Ziel-ID des Tools
-            setActiveTool(targetId); // Ruft die Funktion zur Aktivierung des Tools auf
+            const targetId = e.currentTarget.dataset.target;
+            setActiveTool(targetId);
         });
     });
 }
@@ -1023,64 +1035,44 @@ function setupToolbar() {
 
 // Wird ausgeführt, wenn das DOM vollständig geladen ist
 window.addEventListener('DOMContentLoaded', () => {
-    initMap(); // Initialisiert die Karte
-    loadLists(); // Lädt die Listen von Ländern und Marken
-    setupSidebars(); // Richtet die Funktionalität der Sidebars ein
-    setupBrandSearch(); // Richtet die Markensuche ein
-    setupToolbar(); // Richtet die Toolbar-Logik ein
-    // NEU: Event Listener für die ESC-Taste
+    initMap();
+    loadLists();
+    setupSidebars();
+    setupBrandSearch();
+    setupToolbar();
+    setupAutocomplete();
+
+    // KORRIGIERT: Escape-Handler
     document.addEventListener('keydown', (e) => {
-        // Prüft, ob die ESC-Taste gedrückt wurde UND ein System ausgewählt ist (selectedBrandDomain != null)
-        if (e.key === 'Escape' && selectedBrandDomain) {
-            // Verhindert das Standardverhalten des Browsers, falls die ESC-Taste anderweitig belegt ist
+        if (e.key === 'Escape') {
             e.preventDefault(); 
-            resetSystemView();
+            // Führe den Reset nur aus, wenn ein System aktiv ist ODER ein Tool geöffnet ist
+            if (selectedBrandDomain || activeToolId) {
+                 resetSystemView();
+            }
         }
     });
     
-    $('#loadBtn').addEventListener('click', loadData); // Event Listener für den Daten-Laden-Button
+    $('#loadBtn').addEventListener('click', loadData);
     
-    // ANPASSUNG 1: GeoJSON Download Button
     $('#geojsonBtn').addEventListener('click', () => {
-        if(!currentGeoJSON) return; 
-
-        // Generiere den Dateinamen dynamisch
+        if(!currentGeoJSON) return;
         const filename = generateFilename(selectedBrandDomain) + '.geojson';
-        
-        // Erstellt einen Blob und startet den Download (nutzt saveAs von FileSaver.js)
         const blob = new Blob([$('#geojson-output').value], {type:'application/geo+json;charset=utf-8'}); 
         saveAs(blob, filename); 
     });
     
-    // ANPASSUNG 2: Zip Download Button ruft die angepasste Funktion auf
     $('#zipBtn').addEventListener('click', downloadZip);
     
-    // Event Listener für die Flexzonen-Checkbox (Layer ein-/ausblenden)
     $('#flexzonesCheckbox').addEventListener('change', (e) => {
-        if (e.target.checked) {
-            if (!map.hasLayer(flexzoneLayer)) {
-                map.addLayer(flexzoneLayer);
-            }
-        } else {
-            if (map.hasLayer(flexzoneLayer)) {
-                map.removeLayer(flexzoneLayer);
-            }
-        }
+        if (e.target.checked) { if (!map.hasLayer(flexzoneLayer)) { map.addLayer(flexzoneLayer); } } 
+        else { if (map.hasLayer(flexzoneLayer)) { map.removeLayer(flexzoneLayer); } }
     });
 
-    // Event Listener für die Business Areas-Checkbox (Layer ein-/ausblenden)
     $('#businessAreasCheckbox').addEventListener('change', (e) => {
-        if (e.target.checked) {
-            if (!map.hasLayer(businessAreaLayer)) {
-                map.addLayer(businessAreaLayer);
-            }
-        } else {
-            if (map.hasLayer(businessAreaLayer)) {
-                map.removeLayer(businessAreaLayer);
-            }
-        }
+        if (e.target.checked) { if (!map.hasLayer(businessAreaLayer)) { map.addLayer(businessAreaLayer); } } 
+        else { if (map.hasLayer(businessAreaLayer)) { map.removeLayer(businessAreaLayer); } }
     });
-
 });
 
 
