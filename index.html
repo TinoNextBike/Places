@@ -15,10 +15,12 @@
       <div class="panel-content">
         <label for="countrySelect" class="label-de-emphasized">Land filtern (optional)</label>
         <select id="countrySelect"></select>
-        <label for="brandSelect" class="label-emphasized">Marke/System wählen</label>
-        <select id="brandSelect">
-            <option value="">--- Marken/Systeme verfügbar ---</option>
-        </select>
+        <label for="brandInput" class="label-emphasized">Marke/System wählen</label>
+        <div class="autocomplete-container">
+          <input id="brandInput" type="text" placeholder="Marke oder Stadt suchen (z.B. nextbike, Leipzig)" autocomplete="off">
+         <input type="hidden" id="brandSelect" value=""> 
+          <div id="autocomplete-results" class="autocomplete-results"></div>
+        </div>
         <label for="citySelect" class="label-de-emphasized">Stadt filtern (optional)</label>
         <select id="citySelect" disabled></select>
 
