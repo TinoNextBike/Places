@@ -99,9 +99,12 @@
     <div class="toggle-container" id="right-toggle-container">
         <button id="toggle-right-panel" class="panel-toggle-btn" title="GeoJSON einklappen">▶</button>
     </div>
-
     <section class="panel" id="right-panel">
         <div class="panel-content" style="display: flex; flex-direction: column;">
+            
+            <div id="drag-drop-zone" style="min-height: 100px; padding: 15px; border: 2px dashed var(--border-gray); display: flex; align-items: center; justify-content: center; text-align: center; color: var(--text-muted); cursor: pointer; margin-bottom: 10px; background-color: var(--background-gray);">
+                <p style="margin: 0;">GeoJSON-Datei hierher ziehen und ablegen, um sie auf der Karte anzuzeigen.</p>
+            </div> 
             <textarea id="geojson-output" readonly placeholder="Hier erscheint der GeoJSON-Code..."></textarea>
             <div class="row">
                 <button class="primary" id="geojsonBtn" disabled>💾 Stationen (.geojson)</button>
