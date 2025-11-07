@@ -164,7 +164,8 @@ function resetSystemView() {
     
     // 3. UI-Elemente zurücksetzen
     $('#countrySelect').value = '';
-    $('#brandSelect').value = ''; // Korrigiert: Nutzt das Dropdown
+    $('#brandInput').value = ''; // KORRIGIERT: Autocomplete Input löschen
+    $('#brandSelect').value = ''; 
     $('#citySelect').innerHTML = '<option value="">Alle Städte im System</option>';
     $('#citySelect').disabled = true;
     $('#quickFilter').value = '';
@@ -173,6 +174,9 @@ function resetSystemView() {
     $('#flexzone-toggle-container').classList.add('hidden');
     $('#geojsonBtn').disabled = true;
     $('#zipBtn').disabled = true;
+    
+    // NEU: Setze das Tool-Panel auf den Standard (Daten/Filter) zurück und klappe es ggf. aus
+    setActiveTool('filter-controls'); 
 
     // 4. City-Marker (alle) wieder anzeigen und auf ihre Bounds zoomen
     cityLayer.eachLayer(marker => {
@@ -381,7 +385,7 @@ function buildBrands(dataCountries) {
 }
 
 // Lädt die Listen der verfügbaren Länder und Nextbike-Systeme von der API
-// Lädt die Listen der verfügbaren Länder und Nextbike-Systeme von der API
+// Lädt die Listen der verfüfbaren Länder und Nextbike-Systeme von der API
 async function loadLists(){
     $('#load-status').style.visibility = 'visible';
     $('#load-status').textContent = 'Systeme werden geladen...';
@@ -465,20 +469,10 @@ async function loadAllBusinessAreas() {
     }
 }
 
-// Aktualisiert die Liste der verfügbaren Marken basierend auf der Länderauswahl
+// Aktualisiert die Anzeige (nur noch Filterung der City-Marker) nach Länderwahl
 function updateAvailableBrands(){
-    const countryCode = ($('#countrySelect').value || '').toUpperCase();
-    const brandSelect = $('#brandSelect');
-
-    availableBrands = brandList.filter(b => !countryCode || b.country_codes.has(countryCode));
-    
-    // Füllt das Marken-Dropdown
-    brandSelect.innerHTML = '<option value="">--- Marken/Systeme verfügbar ---</option>';
-    availableBrands.forEach(system => {
-        brandSelect.appendChild(option(system.key, `${system.name} (${system.domain})`));
-    });
-    brandSelect.disabled = false;
-    
+    $('#brandInput').value = ''; // Leert das Autocomplete-Feld bei Länderwechsel
+    $('#brandSelect').value = ''; // Leert den versteckten Wert
     selectedBrandDomain = null; 
     
     $('#flexzone-toggle-container').classList.add('hidden');
@@ -554,18 +548,30 @@ function drawAllCityMarkers() {
             }
         });
         
-        // Klick-Handler: Löst den Ladevorgang aus, indem das Marken-Dropdown aktualisiert wird
+        // KORRIGIERT: Klick-Handler: Löst den Ladevorgang aus, indem das Marken-Dropdown aktualisiert wird
         marker.on('click', function() {
             const brandSelect = $('#brandSelect');
+            const brandInput = $('#brandInput'); // NEU: Referenz auf das sichtbare Input-Feld
             
             // 1. Land auswählen, falls nicht schon gewählt
             $('#countrySelect').value = city.country_code;
             
-            // 2. Marke/System im Dropdown setzen
+            // 2. Marke/System im versteckten Feld setzen
             brandSelect.value = city.domain; 
+            
+            // NEU: Setze den Klartextnamen im sichtbaren Autocomplete-Feld
+            const selectedBrand = brandList.find(b => b.domain === city.domain);
+            if (selectedBrand) {
+                brandInput.value = selectedBrand.name;
+            } else {
+                 brandInput.value = city.domain; // Fallback, falls Name nicht gefunden
+            }
             
             // 3. Auslösen des Change-Events, um die gesamte Logik (Daten laden, Zoom) zu starten
             brandSelect.dispatchEvent(new Event('change'));
+            
+            // NEU: Wir öffnen sofort das Daten-/Filter-Panel, um Konsistenz zu gewährleisten
+            setActiveTool('filter-controls');
         });
 
         const popupContent = `<b>${city.name}</b><br>System: ${city.domain || 'N/A'}<br>Land: ${city.country_code}`;
@@ -829,10 +835,143 @@ function setupSidebars() {
         });
     }
 }
+/**
+ * Richtet die Autovervollständigung für die Markensuche ein.
+ * Verwendet brandInput und brandSelect (hidden input).
+ */
+function setupAutocomplete() {
+    const input = $('#brandInput');
+    const resultsDiv = $('#autocomplete-results');
+    const brandSelectHidden = $('#brandSelect');
+    let currentFocus = -1; // Index des aktuell fokussierten Elements
 
+    // Setzt den ausgewählten Wert und löst das Change-Event aus
+    const selectItem = (domain, name) => {
+        input.value = name; 
+        brandSelectHidden.value = domain;
+        resultsDiv.innerHTML = '';
+        resultsDiv.style.display = 'none';
+        input.classList.remove('active-search');
+        
+        // Simuliere den Change-Event des alten Dropdowns, um die Lade-Logik zu triggern
+        brandSelectHidden.dispatchEvent(new Event('change'));
+    };
+
+    // Erzeugt die Autocomplete-Ergebnis-Liste
+    const renderResults = (arr) => {
+        resultsDiv.innerHTML = '';
+        resultsDiv.style.display = 'none';
+        currentFocus = -1;
+        
+        if (arr.length === 0) return;
+        
+        arr.slice(0, 10).forEach((item, index) => { // Zeige max. 10 Ergebnisse
+            const itemDiv = document.createElement('div');
+            itemDiv.classList.add('autocomplete-item');
+            
+            // Hebt den Suchbegriff hervor
+            const regex = new RegExp(input.value, 'gi');
+            const highlightedName = item.name.replace(regex, (match) => `<strong>${match}</strong>`);
+            
+            itemDiv.innerHTML = `${highlightedName} <small>${item.domain}</small>`;
+            itemDiv.dataset.domain = item.domain;
+            itemDiv.dataset.name = item.name;
+
+            itemDiv.addEventListener('click', () => {
+                selectItem(item.domain, item.name);
+            });
+            resultsDiv.appendChild(itemDiv);
+        });
+        
+        resultsDiv.style.display = 'block';
+        input.classList.add('active-search');
+    };
+    
+    // Tastatur-Navigation
+    const addActive = (x) => {
+        if (!x) return false;
+        removeActive(x);
+        if (currentFocus >= x.length) currentFocus = 0;
+        if (currentFocus < 0) currentFocus = (x.length - 1);
+        x[currentFocus].classList.add('active');
+        x[currentFocus].scrollIntoView({ block: "nearest" });
+    }
+    
+    const removeActive = (x) => {
+        for (let i = 0; i < x.length; i++) {
+            x[i].classList.remove('active');
+        }
+    }
+
+    // Input-Event: Filtert die Markenliste
+    input.addEventListener('input', function() {
+        const val = this.value.toLowerCase();
+        
+        if (!val) {
+            brandSelectHidden.value = ''; // Setze den Domain-Wert zurück
+            renderResults([]);
+            // Wenn das Suchfeld leer ist, zeige alle City-Marker an und zoome darauf
+            refreshCitySelect();
+            cityLayer.eachLayer(marker => { if (marker.getElement()) { marker.getElement().style.display = ''; } });
+            if (cityLayer.getLayers().length > 0) { map.fitBounds(cityLayer.getBounds(), {padding: [50, 50]}); }
+            return;
+        }
+
+        // Filtere basierend auf dem Suchtext
+        const countryCode = ($('#countrySelect').value || '').toLowerCase();
+        const filtered = brandList.filter(b => 
+            (!countryCode || b.country_codes.has(countryCode.toUpperCase())) &&
+            ((b.name || '').toLowerCase().includes(val) || (b.domain || '').toLowerCase().includes(val))
+        );
+        renderResults(filtered);
+    });
+
+    // Tastatur-Events (Pfeiltasten, Enter)
+    input.addEventListener('keydown', function(e) {
+        let x = resultsDiv.getElementsByClassName('autocomplete-item');
+        if (e.key === 'ArrowDown') {
+            currentFocus++;
+            addActive(x);
+        } else if (e.key === 'ArrowUp') {
+            currentFocus--;
+            addActive(x);
+        } else if (e.key === 'Enter') {
+            e.preventDefault();
+            if (currentFocus > -1) {
+                if (x) x[currentFocus].click();
+            } else if (x.length > 0) {
+                 // Wenn Enter gedrückt und kein Element ausgewählt, wähle das erste
+                 x[0].click();
+            }
+        }
+    });
+
+    // Klick außerhalb des Autocomplete-Felds schließt die Ergebnisse
+    document.addEventListener('click', (e) => {
+        if (!resultsDiv.contains(e.target) && e.target !== input) {
+            resultsDiv.innerHTML = '';
+            resultsDiv.style.display = 'none';
+            input.classList.remove('active-search');
+        }
+    });
+    
+    // Wenn das Eingabefeld den Fokus verliert und der Wert gesetzt ist,
+    // ersetze den Domain-Wert durch den Klartextnamen.
+    input.addEventListener('blur', () => {
+         const currentDomain = brandSelectHidden.value;
+         if (currentDomain) {
+             const selectedBrand = brandList.find(b => b.domain === currentDomain);
+             if (selectedBrand && input.value !== selectedBrand.name) {
+                 input.value = selectedBrand.name;
+             }
+         }
+    });
+
+}
+// Richtet die Logik für die Auswahl der Nextbike-Marken (Systeme) ein
 // Richtet die Logik für die Auswahl der Nextbike-Marken (Systeme) ein
 function setupBrandSearch() {
-    const brandSelect = $('#brandSelect');
+    const brandSelectHidden = $('#brandSelect'); // Das HIDDEN-Feld
     const countrySelect = $('#countrySelect');
     const flexzoneToggle = $('#flexzone-toggle-container');
     
@@ -841,9 +980,10 @@ function setupBrandSearch() {
         updateAvailableBrands();
     });
 
-    // Event Listener für das Marken/System-Dropdown (Zentralisierte Logik)
-    brandSelect.addEventListener('change', () => {
-        const selectedDomain = brandSelect.value;
+    // Event Listener für das Marken/System-Feld (Jetzt ein verstecktes Feld, 
+    // das durch Autocomplete mit Werten gefüllt wird)
+    brandSelectHidden.addEventListener('change', () => {
+        const selectedDomain = brandSelectHidden.value;
         
         layer.clearLayers(); 
         flexzoneLayer.clearLayers(); 
@@ -857,12 +997,16 @@ function setupBrandSearch() {
             
             refreshCitySelect(); 
             
+            // Verstecke die City-Marker, sobald eine Brand gewählt ist
+            cityLayer.eachLayer(marker => { if (marker.getElement()) { marker.getElement().style.display = 'none'; } });
+
         } else {
             selectedBrandDomain = null;
             flexzoneToggle.classList.add('hidden');
             
             refreshCitySelect(); 
-
+            
+            // Logik zum Zoomen auf sichtbare City-Marker (nur die des ausgewählten Landes)
             const visibleLayers = cityLayer.getLayers().filter(marker => marker.getElement().style.display !== 'none');
             const visibleLayerGroup = L.featureGroup(visibleLayers);
 
@@ -896,11 +1040,16 @@ window.addEventListener('DOMContentLoaded', () => {
     setupSidebars();
     setupBrandSearch();
     setupToolbar();
+    setupAutocomplete();
 
+    // KORRIGIERT: Escape-Handler
     document.addEventListener('keydown', (e) => {
-        if (e.key === 'Escape' && selectedBrandDomain) {
+        if (e.key === 'Escape') {
             e.preventDefault(); 
-            resetSystemView();
+            // Führe den Reset nur aus, wenn ein System aktiv ist ODER ein Tool geöffnet ist
+            if (selectedBrandDomain || activeToolId) {
+                 resetSystemView();
+            }
         }
     });
     
