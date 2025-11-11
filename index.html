@@ -24,21 +24,24 @@
         <label for="citySelect" class="label-de-emphasized">Stadt filtern (optional)</label>
         <select id="citySelect" disabled></select>
 
-        <div id="filter-controls" class="tool-section hidden">
+        <div id="filter-controls" class="tool-section">
             <hr style="border:none; border-top: 1px solid var(--border-gray); margin: 20px 0;">
             <div>
                 <label for="quickFilter">Schnellfilter</label>
                 <input id="quickFilter" type="text" placeholder="z.B. „Hauptbahnhof“" />
             </div>
             
-            <div class="checkbox-container hidden" id="flexzone-toggle-container">
-                <input type="checkbox" id="flexzonesCheckbox" checked>
-                <label for="flexzonesCheckbox">Flexzonen anzeigen</label>
+            <div class="checkbox-container" id="flexzone-toggle-container">
+                <div class="checkbox-row">
+                    <input type="checkbox" id="flexzonesCheckbox" checked>
+                    <label for="flexzonesCheckbox">Flexzonen anzeigen</label>
+                </div>
 
-              <input type="checkbox" id="businessAreasCheckbox" checked>
-              <label for="businessAreasCheckbox">Business Areas anzeigen</label>
+                <div class="checkbox-row">
+                    <input type="checkbox" id="businessAreasCheckbox" checked>
+                    <label for="businessAreasCheckbox">Business Areas anzeigen</label>
+                </div>
             </div>
-            
             <div class="row">
               <button class="primary" id="loadBtn"><span id="loadIcon"></span>laden</button>
             </div>
