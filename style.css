@@ -412,6 +412,31 @@ button.primary {
     .toggle-container {
         top: var(--top-toolbar-height); /* Verschiebt die Toggle-Buttons unter die neue Toolbar */
     }
+    /* style.css - NEUE REGELN AM ENDE HINZUFÜGEN */
+
+.checkbox-container {
+    /* Entfernt alte Flex-Eigenschaften, da wir jetzt .checkbox-row verwenden */
+    display: block; 
+}
+.checkbox-row {
+    display: flex;
+    align-items: center;
+    margin-bottom: 5px; /* Abstand zwischen den Checkboxen */
+}
+.checkbox-row input[type="checkbox"] {
+    width: auto; /* Checkboxen sollen nicht volle Breite einnehmen */
+    margin-right: 8px; /* Abstand zwischen Checkbox und Label */
+}
+.checkbox-row label {
+    margin: 0; /* Entfernt unnötige Margins */
+    font-weight: 400; 
+    color: var(--text-dark);
+    font-size: 1.1rem;
+    cursor: pointer;
+}
+.checkbox-container.hidden {
+    display: none;
+}
     
     /* Leaflet Controls müssen nicht mehr verschoben werden, da sie von .toggle-container verdeckt werden. */
     /* Sie werden aber von Leaflet selbst unterhalb der Toggle-Container positioniert, was ok ist. */
