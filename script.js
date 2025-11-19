@@ -1,6 +1,14 @@
+// ==================================================================================
+// HAUPT-SKRIPT: Nextbike Map Viewer mit integriertem ORS Isochronen-Tool
+// ==================================================================================
+
 // Neue Konstante für den API-Schlüssel (Bestätigter Wert)
 const ORS_API_KEY = 'eyJvcmciOiI1YjNjZTM1OTc4NTExMTEwMDFjZjYyNDgiLCJpZCI6IjJiMWZmNzYzNGZjMTRlYzlhODY0ZjMyOWE3ODFkNmVlIiwiaCI6Im11cm11cjY0In0=';
 const ORS_BASE_ENDPOINT = 'https://api.openrouteservice.org/v2/isochrones/';
+
+// NEUER FEATURE FLAG: Steuert, ob das Isochronen-Tool geladen und aktiv ist.
+// Setzen Sie dies auf 'false', um die Funktion ohne Codeentfernung abzuschalten.
+const ENABLE_ISOCHRONE_TOOL = true;
 
 const $ = sel => document.querySelector(sel);
 const corsProxy = 'https://corsproxy.io/?';
@@ -9,38 +17,255 @@ const corsProxy = 'https://corsproxy.io/?';
 let map, layer, currentGeoJSON = null;
 let flexzoneLayer, businessAreaLayer;
 let countryList = [], rawCountries = [], brandList = [], availableBrands = [];
-let selectedBrandDomain = null; // Die Domäne des aktuell ausgewählten Nextbike-Systems (wird nun auch von City Select gesetzt)
+let selectedBrandDomain = null;
 let allFlexzones = [];
 let allBusinessAreas = [];
-let activeToolId = 'filter-controls';
+let activeToolId = 'filter-controls'; // Steuert, welche Sektion aktiv ist
 
-// --- Globale Variablen für Isochronen (ORS) ---
+// --- Globale Karten-Layer und Steuerung ---
 let cityLayer = L.featureGroup();
-let isochroneLayer = null;
-let clickMarkers = L.featureGroup();
-let selectedRange = 0;
 let mapLayersControl = null;
+let IsochroneTool = null; // Container für das modulare Isochronen-Tool
 
 // --- Icon-Definitionen ---
-let markerIcon = L.divIcon({
-    className: 'ors-marker-div',
-    iconSize: 	 [12, 12],
-    html: '<div style="background-color: #FF4500; width: 100%; height: 100%; border-radius: 50%; border: 2px solid white; box-shadow: 0 0 5px rgba(0,0,0,0.5);"></div>'
-});
-
 const nextbikeIcon = L.icon({
-    iconUrl: 'pic/marker/marker_nbblue.png',
-    iconSize: 	 [35, 35],
-    iconAnchor: 	 [17, 35],
-    popupAnchor: 	[0, -35]
+    iconUrl: 'bike-icon-dunkelblau.png',
+    iconSize:    [25, 35],
+    iconAnchor:      [17, 35],
+    popupAnchor:    [0, -35]
 });
 
 const cityIcon = L.icon({
-    iconSize:     [50, 50],
-    iconAnchor:   [25, 50],
-    popupAnchor:  [0, -50],
+    iconSize:     [50, 50],
+    iconAnchor:   [25, 50],
+    popupAnchor:  [0, -50],
     iconUrl: 'favicon.png'
 });
+
+// ==================================================================================
+// MODUL: IsochroneToolFactory (Interne Kapselung der ORS-Logik)
+// ==================================================================================
+
+/**
+ * Kapselt die gesamte OpenRouteService (ORS) Isochronen-Funktionalität.
+ * @param {L.Map} mapInstance Die Leaflet-Map-Instanz.
+ * @param {object} LInstance Die Leaflet-Bibliothek.
+ */
+function IsochroneToolFactory(mapInstance, LInstance) {
+
+    // --- Private Variablen des Moduls ---
+    const map = mapInstance;
+    const L = LInstance;
+    let isochroneLayer = null;
+    let clickMarkers = L.featureGroup();
+    let selectedRange = 0; // Lokale Speicherung des aktuellen Zeitbereichs
+
+    // Lokales Icon
+    const markerIcon = L.divIcon({
+        className: 'ors-marker-div',
+        iconSize:    [12, 12],
+        html: '<div style="background-color: #FF4500; width: 100%; height: 100%; border-radius: 50%; border: 2px solid white; box-shadow: 0 0 5px rgba(0,0,0,0.5);"></div>'
+    });
+
+    /**
+     * Ruft die ORS Isochrone API auf, um die Erreichbarkeitszone zu berechnen.
+     */
+    async function fetchIsochrone() {
+        const statusDiv = $('#isochrone-status'); 
+        const calculateBtn = $('#calculateIsochroneBtn');
+        
+        const locations = [];
+        clickMarkers.eachLayer(marker => {
+            const latlng = marker.getLatLng();
+            locations.push([latlng.lng, latlng.lat]);
+        });
+        
+        if (locations.length === 0 || selectedRange === 0) {
+            statusDiv.textContent = 'Fehler: Startpunkt(e) oder Zeitbereich fehlen.';
+            return;
+        }
+
+        const profile = $('#orsProfileSelect').value;
+        const profileText = $('#orsProfileSelect').options[$('#orsProfileSelect').selectedIndex].text.trim();
+
+        calculateBtn.disabled = true;
+        $('#calcIcon').innerHTML = '<span class="spinner"></span>';
+        const rangeText = document.querySelector('.ors-range-btn.active')?.textContent || (selectedRange / 60) + ' Min.';
+        statusDiv.textContent = `Berechne ${profileText}, ${rangeText} für ${locations.length} Punkt(e)...`;
+        isochroneLayer.clearLayers();
+
+        const requestBody = {
+            locations: locations,
+            range: [selectedRange],
+            range_type: 'time',
+            attributes: ['area', 'reachfactor'],
+        };
+
+        try {
+            const dynamicEndpoint = `${ORS_BASE_ENDPOINT}${profile}`;
+            const encodedApiKey = encodeURIComponent(ORS_API_KEY);
+            const orsUrlWithKey = `${dynamicEndpoint}?api_key=${encodedApiKey}`;
+            const urlWithProxy = `${corsProxy}${orsUrlWithKey}`;
+            
+            const resp = await fetch(urlWithProxy, { 
+                method: 'POST',
+                headers: {
+                    'Accept': 'application/json, application/geo+json, application/gpx+xml, img/png; charset=utf-8',
+                    'Content-Type': 'application/json; charset=utf-8'
+                },
+                body: JSON.stringify(requestBody)
+            });
+
+            if (!resp.ok) {
+                const errorText = await resp.text();
+                // Fehlerbehandlung beibehalten
+                let errorMessage = `ORS API HTTP Fehler: ${resp.status}`;
+                try {
+                    const errorData = JSON.parse(errorText);
+                    errorMessage = `ORS API Fehler: ${errorData.error.message || errorData.error.info || 'Unbekannt'}`;
+                } catch {
+                    errorMessage = `ORS API Fehler: ${resp.status} - ${errorText.substring(0, 100)}...`;
+                }
+                throw new Error(errorMessage);
+            }
+            
+            const geojson = await resp.json();
+            
+            isochroneLayer.addData(geojson);
+            
+            statusDiv.textContent = `${profileText}, ${rangeText} erfolgreich geladen für ${locations.length} Punkt(e).`;
+            
+        } catch (e) {
+            console.error("Fehler beim Abrufen der Isochrone:", e);
+            statusDiv.textContent = 'Fehler beim Laden der Isochrone: ' + e.message;
+        }
+        finally {
+            calculateBtn.disabled = false;
+            $('#calcIcon').innerHTML = '';
+        }
+    }
+
+    /**
+     * Fügt einen Marker auf der Karte hinzu, nachdem die Klickprüfung in script.js erfolgt ist.
+     */
+    function addMarker(latlng) {
+        if (selectedRange === 0) {
+            alert("Bitte wählen Sie zuerst eine Fahrzeit (z.B. 15 min) aus.");
+            return;
+        }
+        
+        if (clickMarkers.getLayers().length >= 5) {
+            alert("Sie können maximal 5 Startpunkte gleichzeitig setzen.");
+            return;
+        }
+        
+        const newMarker = L.marker(latlng, { icon: markerIcon }).addTo(clickMarkers);
+        
+        const count = clickMarkers.getLayers().length;
+        newMarker.bindPopup(`Startpunkt ${count}: ${latlng.lat.toFixed(4)}, ${latlng.lng.toFixed(4)}`).openPopup();
+        
+        const rangeText = document.querySelector('.ors-range-btn.active')?.textContent || 'Zeit gewählt';
+        const profileText = $('#orsProfileSelect').options[$('#orsProfileSelect').selectedIndex].text.trim();
+        $('#isochrone-status').textContent = `${profileText}, ${rangeText}. ${count} Punkt(e) gesetzt. Berechnen drücken.`;
+        $('#calculateIsochroneBtn').disabled = false;
+        $('#clearIsochroneBtn').disabled = false;
+    }
+
+    /**
+     * Löscht nur die Marker und die Isochronen-Polygone und setzt den UI-Status zurück.
+     * Wird auch für clearAllLayers von resetSystemView verwendet.
+     */
+    function clear() {
+        clickMarkers.clearLayers();
+        isochroneLayer.clearLayers();
+        $('#calculateIsochroneBtn').disabled = true;
+        $('#clearIsochroneBtn').disabled = true;
+        
+        const activeBtn = document.querySelector('.ors-range-btn.active');
+        const profileText = $('#orsProfileSelect').options[$('#orsProfileSelect').selectedIndex].text.trim();
+
+        if (activeBtn) {
+            $('#isochrone-status').textContent = `Profil (${profileText}) und Zeit (${activeBtn.textContent}) gewählt. Klicken Sie auf die Karte, um Punkte zu setzen.`;
+        } else {
+            $('#isochrone-status').textContent = `Profil (${profileText}) gewählt. Bitte wählen Sie eine Zeit aus.`;
+        }
+        
+        $('#calcIcon').innerHTML = '';
+    }
+    
+    /**
+     * Initialisiert Layer und Event-Handler des Isochronen-Tools.
+     */
+    function init(baseMaps) {
+        // 1. Initialisiere den Isochronen-Layer und füge Marker-Layer hinzu
+        isochroneLayer = L.geoJSON(null, {
+            style: {
+                color: '#FF4500', weight: 3, opacity: 0.7, fillColor: '#FF6347', fillOpacity: 0.2
+            },
+            onEachFeature: (f, l) => {
+                const minutes = selectedRange / 60;
+                const profileText = $('#orsProfileSelect').options[$('#orsProfileSelect').selectedIndex].text.trim();
+                l.bindPopup(`<b>${minutes} Minuten (${profileText})</b>`);
+            }
+        }).addTo(map); 
+        
+        clickMarkers.addTo(map);
+
+        // 2. Setze Event-Handler für die UI-Steuerung (Zeitbereich)
+        document.querySelectorAll('.ors-range-btn').forEach(button => {
+            button.addEventListener('click', function() {
+                document.querySelectorAll('.ors-range-btn').forEach(btn => btn.classList.remove('active'));
+                this.classList.add('active');
+                
+                selectedRange = parseInt(this.dataset.range);
+                
+                if (clickMarkers.getLayers().length > 0) {
+                     $('#calculateIsochroneBtn').disabled = false;
+                     $('#clearIsochroneBtn').disabled = false;
+                     $('#isochrone-status').textContent = `${this.textContent} gewählt. ${clickMarkers.getLayers().length} Punkt(e) gesetzt. Berechnen drücken.`;
+                } else {
+                     $('#calculateIsochroneBtn').disabled = true;
+                     $('#isochrone-status').textContent = `Klicken Sie auf die Karte, um den Startpunkt zu setzen.`;
+                }
+            });
+        });
+
+        // 3. Setze Event-Handler für Profil-Änderung (löscht alte Daten)
+        $('#orsProfileSelect').addEventListener('change', () => {
+            clear();
+            const profileText = $('#orsProfileSelect').options[$('#orsProfileSelect').selectedIndex].text.trim();
+            $('#isochrone-status').textContent = `Profil (${profileText}) gewählt. Bitte neue Zeit wählen.`;
+            
+            document.querySelectorAll('.ors-range-btn').forEach(btn => btn.classList.remove('active'));
+            selectedRange = 0;
+        });
+        
+        // 4. Setze Event-Handler für Berechnen und Löschen
+        $('#calculateIsochroneBtn').addEventListener('click', fetchIsochrone);
+        $('#clearIsochroneBtn').addEventListener('click', clear);
+
+        // 5. Füge die Isochronen-Layer zur MapLayersControl hinzu
+        if (window.mapLayersControl) {
+            window.mapLayersControl.addOverlay(isochroneLayer, "ORS Isochrone");
+            window.mapLayersControl.addOverlay(clickMarkers, "Startpunkte");
+        }
+        
+        $('#isochrone-status').textContent = `Klicken Sie auf das Werkzeug, um die Isochronen-Funktion zu nutzen.`;
+    }
+
+    // Definiere die öffentliche Schnittstelle des Moduls
+    return {
+        init: init,
+        addMarker: addMarker,
+        clear: clear,
+        clearAllLayers: clear // Nutzt dieselbe Funktion
+    };
+}
+
+
+// ==================================================================================
+// HAUPT-FUNKTIONEN (UI & Nextbike API)
+// ==================================================================================
 
 /**
  * Steuert, welche Werkzeug-Sektion im linken Panel aktiv ist.
@@ -115,71 +340,15 @@ function handleFileDrop(e) {
     }
 }
 
-// Initialisiert den Isochronen-Layer und die Event-Handler
-function initIsochroneFunctionality(baseMaps) {
-    isochroneLayer = L.geoJSON(null, {
-        style: {
-            color: '#FF4500', weight: 3, opacity: 0.7, fillColor: '#FF6347', fillOpacity: 0.2
-        },
-        onEachFeature: (f, l) => {
-            const minutes = selectedRange / 60;
-            const profileText = $('#orsProfileSelect').options[$('#orsProfileSelect').selectedIndex].text.trim();
-            l.bindPopup(`<b>${minutes} Minuten (${profileText})</b>`);
-        }
-    }).addTo(map);
-    
-    clickMarkers.addTo(map);
-    cityLayer.addTo(map);
-    
-    document.querySelectorAll('.ors-range-btn').forEach(button => {
-        button.addEventListener('click', function() {
-            document.querySelectorAll('.ors-range-btn').forEach(btn => btn.classList.remove('active'));
-            this.classList.add('active');
-            
-            selectedRange = parseInt(this.dataset.range);
-            
-            if (clickMarkers.getLayers().length > 0) {
-                 $('#calculateIsochroneBtn').disabled = false;
-                 $('#clearIsochroneBtn').disabled = false;
-                 $('#isochrone-status').textContent = `${this.textContent} gewählt. ${clickMarkers.getLayers().length} Punkt(e) gesetzt. Berechnen drücken.`;
-            } else {
-                 $('#calculateIsochroneBtn').disabled = true;
-                 $('#isochrone-status').textContent = `Klicken Sie auf die Karte, um den Startpunkt zu setzen.`;
-            }
-        });
-    });
-
-    $('#orsProfileSelect').addEventListener('change', () => {
-        clearIsochrone();
-        const profileText = $('#orsProfileSelect').options[$('#orsProfileSelect').selectedIndex].text.trim();
-        $('#isochrone-status').textContent = `Profil (${profileText}) gewählt. Bitte neue Zeit wählen.`;
-        
-        document.querySelectorAll('.ors-range-btn').forEach(btn => btn.classList.remove('active'));
-        selectedRange = 0;
-    });
-
-    $('#calculateIsochroneBtn').addEventListener('click', fetchIsochrone);
-    $('#clearIsochroneBtn').addEventListener('click', clearIsochrone);
-}
-
-// Löscht alle Isochronen-Marker und das Polygon-Ergebnis
+/**
+ * Löscht Isochronen-Layer und Marker. Delegiert an das Modul.
+ */
 function clearIsochrone() {
-    clickMarkers.clearLayers();
-    isochroneLayer.clearLayers();
-    $('#calculateIsochroneBtn').disabled = true;
-    $('#clearIsochroneBtn').disabled = true;
-    
-    const activeBtn = document.querySelector('.ors-range-btn.active');
-    const profileText = $('#orsProfileSelect').options[$('#orsProfileSelect').selectedIndex].text.trim();
-
-    if (activeBtn) {
-        $('#isochrone-status').textContent = `Profil (${profileText}) und Zeit (${activeBtn.textContent}) gewählt. Klicken Sie auf die Karte, um Punkte zu setzen.`;
-    } else {
-        $('#isochrone-status').textContent = `Profil (${profileText}) gewählt. Bitte wählen Sie eine Zeit aus.`;
+    if (ENABLE_ISOCHRONE_TOOL && IsochroneTool) {
+        IsochroneTool.clear();
     }
-    
-    $('#calcIcon').innerHTML = '';
 }
+
 
 /**
  * Setzt die Kartenansicht und den UI-Status zurück, um alle Nextbike-Systeme
@@ -190,8 +359,11 @@ function resetSystemView() {
     layer.clearLayers(); 
     flexzoneLayer.clearLayers();
     businessAreaLayer.clearLayers();
-    isochroneLayer.clearLayers();
-    clickMarkers.clearLayers();
+    
+    // Isochronen-Layer-Löschung an Modul delegieren
+    if (ENABLE_ISOCHRONE_TOOL && IsochroneTool) {
+        IsochroneTool.clearAllLayers();
+    }
     
     // 2. Globale Variablen zurücksetzen
     selectedBrandDomain = null;
@@ -206,7 +378,7 @@ function resetSystemView() {
     $('#load-status').textContent = 'Bitte Auswahl treffen.';
     $('#geojson-output').value = '';
     
-    // KORREKTUR: Checkboxen zurücksetzen, deaktivieren und verstecken
+    // Checkboxen zurücksetzen, deaktivieren und verstecken
     $('#flexzonesCheckbox').checked = true;
     $('#businessAreasCheckbox').checked = true;
     $('#flexzonesCheckbox').disabled = true;
@@ -231,107 +403,17 @@ function resetSystemView() {
 
 
 // Behandelt Karten-Klicks für den Isochronen-Startpunkt
+// Diese Funktion enthält die zentrale Kontrolllogik (activeToolId)
 function onMapClickForIsochrone(e) {
-    if (activeToolId !== 'isochrone-controls') return;
+    // 1. Prüfe, ob das Tool aktiviert UND aktiv in der UI ist
+    if (!ENABLE_ISOCHRONE_TOOL || activeToolId !== 'isochrone-controls') return;
     
-    if (selectedRange === 0) {
-        alert("Bitte wählen Sie zuerst eine Fahrzeit (z.B. 15 min) aus.");
-        return;
-    }
-    
-    if (clickMarkers.getLayers().length >= 5) {
-        alert("Sie können maximal 5 Startpunkte gleichzeitig setzen.");
-        return;
-    }
-    
-    const latlng = e.latlng;
-    
-    const newMarker = L.marker(latlng, { icon: markerIcon }).addTo(clickMarkers);
-    
-    const count = clickMarkers.getLayers().length;
-    newMarker.bindPopup(`Startpunkt ${count}: ${latlng.lat.toFixed(4)}, ${latlng.lng.toFixed(4)}`).openPopup();
-    
-    const rangeText = document.querySelector('.ors-range-btn.active')?.textContent || 'Zeit gewählt';
-    const profileText = $('#orsProfileSelect').options[$('#orsProfileSelect').selectedIndex].text.trim();
-    $('#isochrone-status').textContent = `${profileText}, ${rangeText}. ${count} Punkt(e) gesetzt. Berechnen drücken.`;
-    $('#calculateIsochroneBtn').disabled = false;
-    $('#clearIsochroneBtn').disabled = false;
-}
-
-// Ruft die ORS Isochrone API auf, um die Erreichbarkeitszone zu berechnen
-async function fetchIsochrone() {
-    const statusDiv = $('#isochrone-status'); 
-    const calculateBtn = $('#calculateIsochroneBtn');
-    
-    const locations = [];
-    clickMarkers.eachLayer(marker => {
-        const latlng = marker.getLatLng();
-        locations.push([latlng.lng, latlng.lat]);
-    });
-    
-    if (locations.length === 0) {
-        statusDiv.textContent = 'Es wurden keine Startpunkte gesetzt.';
-        return;
-    }
-
-    const profile = $('#orsProfileSelect').value;
-    const profileText = $('#orsProfileSelect').options[$('#orsProfileSelect').selectedIndex].text.trim();
-
-    calculateBtn.disabled = true;
-    $('#calcIcon').innerHTML = '<span class="spinner"></span>';
-    const rangeText = document.querySelector('.ors-range-btn.active')?.textContent || (selectedRange / 60) + ' Min.';
-    statusDiv.textContent = `Berechne ${profileText}, ${rangeText} für ${locations.length} Punkt(e)...`;
-    isochroneLayer.clearLayers();
-
-    const requestBody = {
-        locations: locations,
-        range: [selectedRange],
-        range_type: 'time',
-        attributes: ['area', 'reachfactor'],
-    };
-
-    try {
-        const dynamicEndpoint = `${ORS_BASE_ENDPOINT}${profile}`;
-        const encodedApiKey = encodeURIComponent(ORS_API_KEY);
-        const orsUrlWithKey = `${dynamicEndpoint}?api_key=${encodedApiKey}`;
-        const urlWithProxy = `${corsProxy}${orsUrlWithKey}`;
-        
-        const resp = await fetch(urlWithProxy, { 
-            method: 'POST',
-            headers: {
-                'Accept': 'application/json, application/geo+json, application/gpx+xml, img/png; charset=utf-8',
-                'Content-Type': 'application/json; charset=utf-8'
-            },
-            body: JSON.stringify(requestBody)
-        });
-
-        if (!resp.ok) {
-            const errorText = await resp.text();
-            let errorMessage = `ORS API HTTP Fehler: ${resp.status}`;
-            try {
-                const errorData = JSON.parse(errorText);
-                errorMessage = `ORS API Fehler: ${errorData.error.message || errorData.error.info || 'Unbekannt'}`;
-            } catch {
-                errorMessage = `ORS API Fehler: ${resp.status} - ${errorText.substring(0, 100)}...`;
-            }
-            throw new Error(errorMessage);
-        }
-        
-        const geojson = await resp.json();
-        
-        isochroneLayer.addData(geojson);
-        
-        statusDiv.textContent = `${profileText}, ${rangeText} erfolgreich geladen für ${locations.length} Punkt(e).`;
-        
-    } catch (e) {
-        console.error("Fehler beim Abrufen der Isochrone:", e);
-        statusDiv.textContent = 'Fehler beim Laden der Isochrone: ' + e.message;
-    }
-    finally {
-        calculateBtn.disabled = false;
-        $('#calcIcon').innerHTML = '';
+    // 2. Delegiert die eigentliche Marker-Logik an das Modul
+    if (IsochroneTool) {
+        IsochroneTool.addMarker(e.latlng);
     }
 }
+
 
 // Initialisiert die Leaflet-Karte und die Basis-Layer
 function initMap(){
@@ -367,23 +449,36 @@ function initMap(){
 
     businessAreaLayer = L.geoJSON(null, {
         style: function(feature) { return { color: "#FF0000", weight: 2, opacity: 0.9, fillColor: "#FF69B4", fillOpacity: 0.2 }; },
-        onEachFeature: (f, l) => { if(f.properties.name) 	{ l.bindPopup(`<b>Business Area: ${f.properties.name}</b>`); } }
+        onEachFeature: (f, l) => { if(f.properties.name)    { l.bindPopup(`<b>Business Area: ${f.properties.name}</b>`); } }
     });
 
     layer.addTo(map);
+    cityLayer.addTo(map);
     
     map.setView([51.1657, 10.4515], 6);
     
-    initIsochroneFunctionality(baseMaps);
+    // KONDITIONELLE ISOCHRONEN-INITIALISIERUNG
+    if (ENABLE_ISOCHRONE_TOOL) {
+        IsochroneTool = IsochroneToolFactory(map, L);
+        // IsochroneTool.init() wird nach mapLayersControl Initialisierung aufgerufen.
+    } else {
+        IsochroneTool = null;
+        console.info("Isochronen-Tool ist über den Feature Flag deaktiviert.");
+    }
 
+    // Layer Control erstellen
     mapLayersControl = L.control.layers(baseMaps, { 
         "Stationen": layer,
         "Flexzonen": flexzoneLayer,
         "Business Areas": businessAreaLayer,
-        "ORS Isochrone": isochroneLayer,
-        "Startpunkte": clickMarkers,
         "Nextbike Städte": cityLayer
     }).addTo(map);
+    
+    // Layer Control muss vor IsochroneTool.init() existieren, falls es aktiv ist.
+    if (ENABLE_ISOCHRONE_TOOL && IsochroneTool) {
+        IsochroneTool.init(baseMaps);
+    }
+
 
     // Initial setze Checkboxen auf disabled=true, da noch nichts ausgewählt ist
     $('#flexzonesCheckbox').disabled = true;
@@ -546,7 +641,7 @@ function fetchCitiesForBrand(domain, countryCode) {
                      country_code: cc,
                      lat: city.lat, 
                      lng: city.lng,
-                    domain: cityDomain || countryDomain // Füge Fallback-Domäne hinzu
+                     domain: cityDomain || countryDomain // Füge Fallback-Domäne hinzu
                  });
             }
         });
@@ -717,9 +812,6 @@ function fcFromNextbike(json){
 }
 
 // Lädt die Stationsdaten basierend auf der aktuellen Auswahl (Land/Marke/Stadt)
-// script.js - ERSETZE loadData
-
-// Lädt die Stationsdaten basierend auf der aktuellen Auswahl (Land/Marke/Stadt)
 async function loadData(){
     // Deaktiviere den manuellen Lade-Button (jetzt "Aktualisieren") nur temporär
     const loadBtn = $('#loadBtn');
@@ -883,7 +975,8 @@ function generateFilename(cityAlias) {
 async function downloadZip() {
     if (!currentGeoJSON) return;
 
-    const zip = new JSZip();
+    // JSZip muss global verfügbar sein
+    const zip = new JSZip(); 
     const baseFilename = generateFilename(selectedBrandDomain);
     
     zip.file("stations.geojson", JSON.stringify(currentGeoJSON, null, 2));
@@ -892,7 +985,7 @@ async function downloadZip() {
     const getSanitizedFeatureName = (feature, defaultPrefix) => {
          const props = feature.properties || {};
          let rawName = props.name || props.id || props.uid || '';
-            
+             
          if (!rawName) {
              return defaultPrefix;
          }
@@ -925,7 +1018,8 @@ async function downloadZip() {
     }
 
     const zipBlob = await zip.generateAsync({type:"blob"});
-    saveAs(zipBlob, baseFilename + ".zip");
+    // saveAs muss global verfügbar sein
+    saveAs(zipBlob, baseFilename + ".zip"); 
 }
 
 // Richtet die Event Listener für das Ein- und Ausklappen der Sidebars ein
@@ -1131,7 +1225,6 @@ function setupBrandSearch() {
 }
 
 
-// FIX: setupCitySelectHandler
 /**
  * Richtet den Event-Handler für das Städte-Dropdown ein.
  */
@@ -1163,7 +1256,7 @@ function setupCitySelectHandler() {
                     domain: (city.domain || '').toLowerCase() || countryDomain // Fallback auf Länder-Domäne
                 }));
             }).find(c => String(c.uid) === cityUid);
-                                                 
+                                                    
             if (selectedCityData && selectedCityData.domain) {
                 // Domäne gefunden (Stadt- oder Länder-Domäne): setzen und Checkboxen aktivieren
                 selectedBrandDomain = selectedCityData.domain;
@@ -1203,11 +1296,17 @@ function setupToolbar() {
 }
 
 
+// ==================================================================================
+// INITIALISIERUNG
+// ==================================================================================
 
 // Wird ausgeführt, wenn das DOM vollständig geladen ist
 window.addEventListener('DOMContentLoaded', () => {
+    // 1. Karte und Nextbike-Basisdaten initialisieren
     initMap();
     loadLists();
+    
+    // 2. UI-Steuerungen einrichten
     setupSidebars();
     setupBrandSearch();
     setupToolbar();
@@ -1215,7 +1314,19 @@ window.addEventListener('DOMContentLoaded', () => {
     setupGeoJsonDropZone(); 
     setupCitySelectHandler();
 
-    // map.on('click') Handler hier initialisieren
+    // --- KONDITIONELLE UI-ANPASSUNG FÜR ISOCHRONE ---
+    if (!ENABLE_ISOCHRONE_TOOL) {
+        // Verstecke den Toolbar-Button
+        const btn = document.querySelector('[data-target="isochrone-controls"]');
+        if (btn) btn.style.display = 'none';
+
+        // Setze den aktiven Tool-Status zurück, falls er standardmäßig Isochrone war
+        if (activeToolId === 'isochrone-controls') {
+            activeToolId = 'filter-controls';
+        }
+    }
+
+    // 3. Zentrale Event-Listener
     map.on('click', onMapClickForIsochrone); 
     
     // KORRIGIERTER Escape-Handler
@@ -1242,8 +1353,8 @@ window.addEventListener('DOMContentLoaded', () => {
     
     $('#zipBtn').addEventListener('click', downloadZip);
     
+    // Event-Listener für Zonen-Layer
     $('#flexzonesCheckbox').addEventListener('change', (e) => {
-        // Lade Daten nur, wenn eine Domäne aktiv ist. loadData() sorgt für die korrekte Anzeige/Entfernung.
         if (selectedBrandDomain) { 
             loadData(); 
         } else if (!e.target.checked) {
@@ -1252,7 +1363,6 @@ window.addEventListener('DOMContentLoaded', () => {
     });
 
     $('#businessAreasCheckbox').addEventListener('change', (e) => {
-        // Lade Daten nur, wenn eine Domäne aktiv ist. loadData() sorgt für die korrekte Anzeige/Entfernung.
         if (selectedBrandDomain) { 
             loadData(); 
         } else if (!e.target.checked) {
