@@ -272,6 +272,12 @@ button.primary {
     border-top: none;
 }
 
+#flexzone-toggle-container {
+    display: flex;
+    flex-direction: row; /* Ordnet die Elemente untereinander an */
+    gap: 50px; /* Definiert den Abstand zwischen allen Elementen gleichmäßig */
+}
+
 
 /* Stile für ORS Isochrone Buttons */
 .ors-range-btn {
