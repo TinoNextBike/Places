@@ -20,7 +20,6 @@ export function renderInitLists() {
         cSel.appendChild(o);
     });
     
-    // UI initialisieren
     refreshBrandSelect();
     drawAllCityMarkers(); 
     refreshCitySelect();
@@ -31,24 +30,40 @@ export function renderInitLists() {
 
 export function setActiveTool(toolId) {
     const isAlreadyActive = (toolId === state.activeToolId);
+    
+    // UI zurücksetzen
     document.querySelectorAll('.toolbar-btn').forEach(btn => btn.classList.remove('active'));
     document.querySelectorAll('.tool-section').forEach(el => el.classList.add('hidden'));
 
     if (isAlreadyActive) {
+        // --- DEAKTIVIEREN ---
         state.activeToolId = null;
         if (!$('#main-wrap').classList.contains('left-collapsed')) $('#toggle-left-panel').click(); 
+        
+        // CSS-Klasse entfernen (Cursor & Klickverhalten normalisieren)
+        $('#map').classList.remove('isochrone-mode');
+
     } else {
+        // --- AKTIVIEREN ---
         state.activeToolId = toolId;
         const targetElement = $(`#${toolId}`);
         if (targetElement) targetElement.classList.remove('hidden');
         const targetButton = $(`[data-target="${toolId}"]`);
         if (targetButton) targetButton.classList.add('active');
         if ($('#main-wrap').classList.contains('left-collapsed')) $('#toggle-left-panel').click();
+        
+        // Prüfen, welches Tool aktiv ist
+        if (toolId === 'isochrone-controls') {
+            // Aktiviert CSS für Fadenkreuz & Klick-Durchlässigkeit
+            $('#map').classList.add('isochrone-mode'); 
+        } else {
+            // Bei anderen Tools wieder normal
+            $('#map').classList.remove('isochrone-mode');
+        }
     }
 }
 
 export function resetSystemView() {
-    // Layer leeren
     state.layers.stationLayer.clearLayers(); 
     state.layers.flexzoneLayer.clearLayers();
     state.layers.businessAreaLayer.clearLayers();
@@ -106,7 +121,6 @@ export async function refreshCitySelect(){
     const countryCode = ($('#countrySelect').value || '').toUpperCase();
     const citySel = $('#citySelect');
     
-    // Filter Marker auf der Karte
     state.layers.cityLayer.eachLayer(marker => {
         const markerDomain = marker.options._domain;
         const domainMatch = !brandKey || markerDomain === brandKey;
@@ -196,7 +210,6 @@ function updateAvailableBrands(){
 export function initUI() {
     const wrap = $('#main-wrap');
     
-    // Sidebar Toggles
     $('#toggle-left-panel').addEventListener('click', () => {
         wrap.classList.toggle('left-collapsed');
         $('#toggle-left-panel').textContent = wrap.classList.contains('left-collapsed') ? '▶' : '◀';
@@ -209,7 +222,6 @@ export function initUI() {
         setTimeout(() => state.map.invalidateSize({debounceMoveend: true}), 350);
     });
 
-    // Dropdowns
     $('#countrySelect').addEventListener('change', () => {
         updateAvailableBrands();
         $('#flexzone-toggle-container').classList.add('hidden');
@@ -275,7 +287,6 @@ export function initUI() {
         loadData();
     });
 
-    // Buttons
     $('#loadBtn').addEventListener('click', loadData);
     $('#toolbar-filter-btn').classList.add('active'); 
     
@@ -286,7 +297,6 @@ export function initUI() {
         });
     });
 
-    // Keys
     document.addEventListener('keydown', (e) => {
         if (e.key === 'Escape') {
             e.preventDefault(); 
@@ -299,7 +309,6 @@ export function initUI() {
         }
     });
 
-    // Checkboxes
     $('#flexzonesCheckbox').addEventListener('change', (e) => {
         if (state.selectedBrandDomain) loadData(); 
         else if (!e.target.checked && state.map.hasLayer(state.layers.flexzoneLayer)) state.map.removeLayer(state.layers.flexzoneLayer);
@@ -310,7 +319,6 @@ export function initUI() {
         else if (!e.target.checked && state.map.hasLayer(state.layers.businessAreaLayer)) state.map.removeLayer(state.layers.businessAreaLayer);
     });
 
-    // Download Buttons
     $('#geojsonBtn').addEventListener('click', () => {
         if(!state.currentGeoJSON) return;
         const filename = generateFilename(state.selectedBrandDomain) + '.geojson';
@@ -318,7 +326,6 @@ export function initUI() {
         saveAs(blob, filename); 
     });
     
-    // Zip Download
     $('#zipBtn').addEventListener('click', async () => {
         if (!state.currentGeoJSON) return;
         const zip = new JSZip(); 
@@ -353,7 +360,6 @@ export function initUI() {
         saveAs(zipBlob, baseFilename + ".zip"); 
     });
     
-    // Drag & Drop
     const dropZone = $('#drag-drop-zone');
     ['dragover', 'dragleave', 'drop'].forEach(evt => dropZone.addEventListener(evt, e => { e.preventDefault(); e.stopPropagation(); }));
     dropZone.addEventListener('drop', (e) => {
