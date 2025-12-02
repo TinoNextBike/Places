@@ -1,4 +1,3 @@
-// js/isochrone.js
 import { state } from './state.js';
 import { ORS_API_KEY, ORS_BASE_ENDPOINT, CORS_PROXY } from './config.js';
 import { $ } from './utils.js';
@@ -103,7 +102,7 @@ export const IsochroneTool = {
         $('#calcIcon').innerHTML = '';
     },
 
-fetchIsochrone: async function() {
+    fetchIsochrone: async function() {
         const statusDiv = $('#isochrone-status'); 
         const calculateBtn = $('#calculateIsochroneBtn');
         
@@ -135,12 +134,8 @@ fetchIsochrone: async function() {
         };
 
         try {
-            // 1. Die "echte" Ziel-URL zusammenbauen (inkl. Key)
             const dynamicEndpoint = `${ORS_BASE_ENDPOINT}${profile}`;
             const targetUrl = `${dynamicEndpoint}?api_key=${ORS_API_KEY}`;
-            
-            // 2. WICHTIG: Die Ziel-URL kodieren, damit der Proxy sie nicht "kaputt macht"
-            // CORS_PROXY ist 'https://corsproxy.io/?'
             const urlWithProxy = `${CORS_PROXY}${encodeURIComponent(targetUrl)}`;
             
             const resp = await fetch(urlWithProxy, { 
@@ -154,7 +149,6 @@ fetchIsochrone: async function() {
 
             if (!resp.ok) {
                 const errorText = await resp.text();
-                // Versuche JSON-Fehler zu lesen
                 let errorMsg = `HTTP ${resp.status}`;
                 try {
                     const jsonErr = JSON.parse(errorText);
@@ -168,7 +162,37 @@ fetchIsochrone: async function() {
             
             const geojson = await resp.json();
             state.layers.isochroneLayer.addData(geojson);
-            statusDiv.textContent = `${profileText}, ${rangeText} erfolgreich geladen für ${locations.length} Punkt(e).`;
+
+            // ============================================================
+            // NEU: BEVÖLKERUNGSBERECHNUNG MIT GEOBLAZE
+            // ============================================================
+            let popInfo = "";
+            
+            // Prüfen, ob geoblaze geladen ist und ob wir ein Raster im State haben
+            if (window.geoblaze && state.populationGeoRaster) {
+                try {
+                    statusDiv.textContent = "Berechne Bevölkerung...";
+                    // Das Polygon der Isochrone holen (Feature 0)
+                    const geometry = geojson.features[0].geometry;
+                    
+                    // Summe der Pixelwerte innerhalb des Polygons berechnen
+                    const results = await geoblaze.sum(state.populationGeoRaster, geometry);
+                    
+                    // Ergebnis runden (results[0] ist der Wert des ersten Bandes)
+                    const totalPop = Math.round(results[0] || 0);
+                    
+                    popInfo = `<br><strong>👥 Bevölkerung: ca. ${totalPop.toLocaleString()}</strong>`;
+                } catch (err) {
+                    console.error("Fehler bei Bevölkerungsberechnung:", err);
+                    popInfo = `<br><small style="color:red;">(Fehler bei Bevölkerungsdaten)</small>`;
+                }
+            } else if (!state.populationGeoRaster) {
+                // Optional: Hinweis, wenn kein Tiff geladen ist
+                // popInfo = "<br><small>(Keine Bevölkerungsdaten geladen)</small>";
+            }
+
+            // Status Update mit HTML (wegen <strong>)
+            statusDiv.innerHTML = `${profileText}, ${rangeText} geladen.${popInfo}`;
             
         } catch (e) {
             console.error("Fehler bei Isochrone:", e);
