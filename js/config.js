@@ -1,0 +1,11 @@
+// js/config.js
+
+export const ORS_API_KEY = 'eyJvcmciOiI1YjNjZTM1OTc4NTExMTAwMDFjZjYyNDgiLCJpZCI6IjJiMWZmNzYzNGZjMTRlYzlhODY0ZjMyOWE3ODFkNmVlIiwiaCI6Im11cm11cjY0In0=';
+export const ORS_BASE_ENDPOINT = 'https://api.openrouteservice.org/v2/isochrones/';
+export const ENABLE_ISOCHRONE_TOOL = true;
+export const CORS_PROXY = 'https://corsproxy.io/?';
+
+// API-Endpunkte
+export const NEXTBIKE_OFFICIAL_API = 'https://maps.nextbike.net/maps/nextbike-official.json';
+export const NEXTBIKE_FLEXZONE_API = 'https://api.nextbike.net/api/v1.1/getFlexzones.json';
+export const NEXTBIKE_API_KEY = 'API_KEY_GELOESCHT'; // War vorher hardcoded im Link
