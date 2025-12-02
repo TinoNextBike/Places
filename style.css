@@ -12,13 +12,10 @@
     --left-panel-width: 380px;
     --right-panel-width: 380px;
     --toggle-btn-width: 24px;
-    --top-toolbar-height: 34px; /* NEU: Höhe der neuen Toolbar reduziert */
+    --top-toolbar-height: 34px; 
 }
 
-html {
-    font-size: 85%;
-}
-
+html { font-size: 85%; }
 * { box-sizing: border-box; }
 
 body {
@@ -86,14 +83,12 @@ body {
     overflow: hidden;
     z-index: 100;
     position: relative;
-    /* Map-Container muss für die Toolbar Höhe Platz schaffen */
     padding-top: var(--top-toolbar-height); 
 }
 
 #map { 
     height: 100%; 
     width: 100%; 
-    /* Map muss relativ zum Container oben starten */
     position: absolute;
     top: 0;
     left: 0;
@@ -175,39 +170,6 @@ button.primary {
     visibility: hidden;
 }
 
-.autocomplete-container {
-    position: relative;
-}
-.autocomplete-results {
-    position: absolute;
-    top: 100%;
-    left: 0;
-    right: 0;
-    background: var(--text-light);
-    border: 1px solid var(--border-gray);
-    border-top: none;
-    border-radius: 0;
-    max-height: 250px;
-    overflow-y: auto;
-    z-index: 1001;
-    display: none;
-}
-.autocomplete-item {
-    padding: 8px 12px;
-    cursor: pointer;
-}
-.autocomplete-item:hover, .autocomplete-item.active {
-    background-color: var(--nextbike-light-blue);
-    color: var(--text-light);
-}
-.autocomplete-item small {
-    color: var(--text-muted);
-    margin-left: 8px;
-}
-.autocomplete-item:hover small, .autocomplete-item.active small {
-    color: var(--text-light);
-}
-
 .label-emphasized {
     color: var(--text-dark);
     font-weight: 700;
@@ -215,15 +177,6 @@ button.primary {
 .label-de-emphasized {
     opacity: 0.7;
     font-weight: 400;
-}
-#brandInput {
-    border: 2px solid var(--nextbike-dark-blue);
-    padding: 7px 9px;
-}
-#brandInput:focus {
-    outline: none;
-    border-color: var(--nextbike-light-blue);
-    box-shadow: 0 0 0 3px rgba(0, 152, 255, 0.2);
 }
 
 .spinner {
@@ -238,9 +191,11 @@ button.primary {
     margin-right: 6px;
 }
 
+@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+/* Checkbox Styles */
 .checkbox-container {
-    display: flex;
-    align-items: center;
+    display: block;
     margin-top: 1rem;
     padding: 8px;
     background-color: var(--background-gray);
@@ -248,14 +203,30 @@ button.primary {
 .checkbox-container.hidden {
     display: none;
 }
-.checkbox-container label {
-    margin: 0;
-    font-weight: 400;
+.checkbox-row {
+    display: flex;
+    align-items: center;
+    margin-bottom: 5px; 
+}
+.checkbox-row input[type="checkbox"] {
+    width: auto; 
+    margin-right: 8px; 
+}
+.checkbox-row label {
+    margin: 0; 
+    font-weight: 400; 
     color: var(--text-dark);
     font-size: 1.1rem;
+    cursor: pointer;
 }
 
-/* Tool Sektionen im linken Panel */
+#flexzone-toggle-container {
+    display: flex;
+    flex-direction: row; 
+    gap: 50px; 
+}
+
+/* Tool Sektionen */
 .tool-section {
     transition: max-height 0.3s ease-in-out, opacity 0.3s ease-in-out;
     overflow: hidden;
@@ -272,14 +243,7 @@ button.primary {
     border-top: none;
 }
 
-#flexzone-toggle-container {
-    display: flex;
-    flex-direction: row; /* Ordnet die Elemente untereinander an */
-    gap: 50px; /* Definiert den Abstand zwischen allen Elementen gleichmäßig */
-}
-
-
-/* Stile für ORS Isochrone Buttons */
+/* ORS Isochrone Buttons */
 .ors-range-btn {
     appearance: none;
     border-radius: 0;
@@ -289,41 +253,28 @@ button.primary {
     font-family: 'Inter', sans-serif;
     font-size: 1.1rem;
     transition: all 0.2s ease-in-out;
-    
     background-color: var(--background-gray);
     color: var(--text-dark);
     border: 1px solid var(--border-gray);
 }
-/* Hover-Zustand */
-.ors-range-btn:hover {
-    background-color: var(--border-gray);
-}
-/* Aktiver/ausgewählter Zustand */
+.ors-range-btn:hover { background-color: var(--border-gray); }
 .ors-range-btn.active {
     background-color: var(--nextbike-light-blue);
     color: var(--text-light);
     border-color: var(--nextbike-light-blue);
     box-shadow: 0 0 0 2px rgba(0, 152, 255, 0.4);
 }
-/* Wenn der aktive Button gehovert wird */
-.ors-range-btn.active:hover {
-    background-color: var(--nextbike-dark-blue);
-}
-/* Deaktivierter Button */
+.ors-range-btn.active:hover { background-color: var(--nextbike-dark-blue); }
 .ors-range-btn:disabled, .ors-range-btn[disabled] {
     opacity: 0.6;
     cursor: not-allowed;
 }
-/* Stil für den benutzerdefinierten ORS-Marker (für Leaflet DivIcon) */
 .ors-marker-div {
     border-radius: 50%;
     background-color: transparent !important;
 }
 
-/* ================================== */
-/* NEUE STYLES FÜR OBERE TOOLBAR */
-/* ================================== */
-
+/* Toolbar Oben */
 #top-toolbar {
     position: absolute;
     top: 0;
@@ -341,7 +292,6 @@ button.primary {
 }
 
 .top-bar-btn {
-    /* Style als aktiver Button */
     display: flex;
     align-items: center;
     padding: 5px 10px;
@@ -355,37 +305,24 @@ button.primary {
     transition: background-color 0.2s;
     border-radius: 2px;
 }
-
-.top-bar-btn i {
-    margin-right: 5px;
-    font-size: 1.1em;
-}
-
-.top-bar-btn:hover {
-    background-color: rgba(255, 255, 255, 0.1);
-}
-
+.top-bar-btn i { margin-right: 5px; font-size: 1.1em; }
+.top-bar-btn:hover { background-color: rgba(255, 255, 255, 0.1); }
 .top-bar-btn.active {
     background-color: var(--nextbike-light-blue);
     border-color: var(--nextbike-light-blue);
 }
 
-/* Leaflet Controls - KEINE MANUELLE VERSCHIEBUNG MEHR, um die Standardposition zu behalten */
+/* Leaflet Controls Positionierung */
 .leaflet-control-zoom {
-    /* ÄNDERUNG HIER: Zeile 338 */
-    top: 54px !important; /* 34px Toolbar-Höhe + 10px Standard-Margin + 10px zusätzlicher Abstand = 54px */
+    top: 54px !important; 
     z-index: 600; 
 }
-
-/* Layer Control */
 .leaflet-control-layers {
-    /* ÄNDERUNG HIER: Zeile 344 */
-    /* Setzt die Layer Control unter die Zoom Control (ca. 64px) + 10px Margin */
-    top: 54px !important; /* 54px (Start Zoom) + 64px (Höhe Zoom) + 10px (Margin) = 128px */
+    top: 54px !important; 
     z-index: 600; 
 }
 
-/* Mobile: Korrektur der Toggle-Buttons-Position */
+/* Mobile Styles */
 @media (max-width: 768px) {
     :root {
         --left-panel-width: 90vw;
@@ -393,15 +330,12 @@ button.primary {
         --toggle-btn-width: 40px;
     }
 
-    body {
-        overflow: hidden;
-    }
+    body { overflow: hidden; }
     
-    /* Mobile: Toolbar über dem Toggle-Button positionieren */
     #top-toolbar {
         top: 0;
         left: 0;
-        padding: 0 55px; /* Platz für die Toggle-Buttons */
+        padding: 0 55px; 
         justify-content: space-around;
     }
 
@@ -411,39 +345,24 @@ button.primary {
         transition: none;
     }
 
-    #map-container {
-        padding-top: var(--top-toolbar-height); 
-    }
+    #map-container { padding-top: var(--top-toolbar-height); }
+    .toggle-container { top: var(--top-toolbar-height); }
+}
 
-    .toggle-container {
-        top: var(--top-toolbar-height); /* Verschiebt die Toggle-Buttons unter die neue Toolbar */
-    }
-    /* style.css - NEUE REGELN AM ENDE HINZUFÜGEN */
+/* ==========================================================================
+   WICHTIG: ISOCHRONE MODUS (Muss GANZ UNTEN stehen!)
+   Sorgt dafür, dass Klicks durch Polygone (Zonen) "durchfallen" auf die Karte.
+========================================================================== */
 
-.checkbox-container {
-    /* Entfernt alte Flex-Eigenschaften, da wir jetzt .checkbox-row verwenden */
-    display: block; 
+/* Wenn der Isochronen-Modus aktiv ist: 
+   Alle SVG-Pfade (Leaflet Polygone) ignorieren Maus-Events. */
+.isochrone-mode path.leaflet-interactive {
+    pointer-events: none !important; 
 }
-.checkbox-row {
-    display: flex;
-    align-items: center;
-    margin-bottom: 5px; /* Abstand zwischen den Checkboxen */
-}
-.checkbox-row input[type="checkbox"] {
-    width: auto; /* Checkboxen sollen nicht volle Breite einnehmen */
-    margin-right: 8px; /* Abstand zwischen Checkbox und Label */
-}
-.checkbox-row label {
-    margin: 0; /* Entfernt unnötige Margins */
-    font-weight: 400; 
-    color: var(--text-dark);
-    font-size: 1.1rem;
-    cursor: pointer;
-}
-.checkbox-container.hidden {
-    display: none;
-}
-    
-    /* Leaflet Controls müssen nicht mehr verschoben werden, da sie von .toggle-container verdeckt werden. */
-    /* Sie werden aber von Leaflet selbst unterhalb der Toggle-Container positioniert, was ok ist. */
+
+/* Zeige ein Fadenkreuz, damit der Nutzer weiß, dass er klicken soll */
+.isochrone-mode,
+.isochrone-mode .leaflet-grab,
+.isochrone-mode .leaflet-container {
+    cursor: crosshair !important;
 }
