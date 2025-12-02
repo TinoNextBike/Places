@@ -8,9 +8,11 @@ export const state = {
     allFlexzones: [],
     allBusinessAreas: [],
     
+    
     // Aktuelle Auswahl & Status
     selectedBrandDomain: null,
     currentGeoJSON: null,
+    populationGeoRaster: null,
     activeToolId: 'filter-controls',
     
     // Map Referenzen (werden später gesetzt)

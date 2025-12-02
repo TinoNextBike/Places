@@ -4,23 +4,29 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Nextbike Places Tool</title>
+  
   <link rel="icon" type="image/png" href="favicon.png">
+  
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <link rel="stylesheet" href="style.css">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css"> 
 </head>
 <body>
   <div class="wrap" id="main-wrap">
+    
     <section class="panel" id="left-panel">
       <div class="panel-content">
         <label for="countrySelect" class="label-de-emphasized">Land filtern (optional)</label>
-         <select id="countrySelect"></select>
-         <label for="brandSelect" class="label-emphasized">Marke/System wählen</label>
+        <select id="countrySelect"></select>
+        
+        <label for="brandSelect" class="label-emphasized">Marke/System wählen</label>
         <select id="brandSelect">
-        <option value="">Alle Systeme</option>
+            <option value="">Alle Systeme</option>
         </select>
-            <label for="citySelect" class="label-de-emphasized">Stadt filtern (optional)</label>
-         <select id="citySelect" disabled></select>
+        
+        <label for="citySelect" class="label-de-emphasized">Stadt filtern (optional)</label>
+        <select id="citySelect" disabled></select>
+
         <div id="filter-controls" class="tool-section">
             <hr style="border:none; border-top: 1px solid var(--border-gray); margin: 20px 0;">
             <div>
@@ -44,6 +50,7 @@
             </div>
             <div class="load-status" id="load-status">Initialisiere...</div>
         </div>
+
         <div id="isochrone-controls" class="tool-section hidden"> 
             <hr style="border:none; border-top: 1px solid var(--border-gray); margin: 20px 0;">
             <label class="label-emphasized" for="orsProfileSelect">ORS Profil wählen</label>
@@ -76,7 +83,7 @@
                 Bitte wählen Sie ein Profil und eine Zeit aus.
             </div>
         </div>
-        </div>
+      </div>
     </section>
 
     <div class="toggle-container" id="left-toggle-container">
@@ -91,17 +98,16 @@
             <a href="#" id="toolbar-iso-btn" title="Isochrone berechnen" role="button" aria-label="Isochrone berechnen" data-target="isochrone-controls" class="toolbar-btn top-bar-btn">
                 <i class="fa-solid fa-route"></i> Isochrone
             </a>
-            </div>
-
-      <div id="map"></div>
+        </div>
+        <div id="map"></div>
     </section>
 
     <div class="toggle-container" id="right-toggle-container">
         <button id="toggle-right-panel" class="panel-toggle-btn" title="GeoJSON einklappen">▶</button>
     </div>
+
     <section class="panel" id="right-panel">
         <div class="panel-content" style="display: flex; flex-direction: column;">
-            
             <div id="drag-drop-zone" style="min-height: 100px; padding: 15px; border: 2px dashed var(--border-gray); display: flex; align-items: center; justify-content: center; text-align: center; color: var(--text-muted); cursor: pointer; margin-bottom: 10px; background-color: var(--background-gray);">
                 <p style="margin: 0;">GeoJSON-Datei hierher ziehen und ablegen, um sie auf der Karte anzuzeigen.</p>
             </div> 
@@ -115,6 +121,12 @@
   </div>
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+  <script src="https://unpkg.com/georaster"></script>
+  <script src="https://unpkg.com/georaster-layer-for-leaflet/dist/georaster-layer-for-leaflet.min.js"></script>
+  <script src="https://unpkg.com/geoblaze"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/chroma-js/2.4.2/chroma.min.js"></script>
+
   <script src="https://cdn.jsdelivr.net/npm/file-saver@2.0.5/dist/FileSaver.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
   
