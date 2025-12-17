@@ -8,10 +8,12 @@
   <link rel="icon" type="image/png" href="favicon.png">
   
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="https://unpkg.com/@geoman-io/leaflet-geoman-free@latest/dist/leaflet-geoman.css" />
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css"> 
+  <link rel="stylesheet" href="style.css">
 </head>
 <body>
+
   <div class="wrap" id="main-wrap">
     
     <section class="panel" id="left-panel">
@@ -98,6 +100,10 @@
             <a href="#" id="toolbar-iso-btn" title="Isochrone berechnen" role="button" aria-label="Isochrone berechnen" data-target="isochrone-controls" class="toolbar-btn top-bar-btn">
                 <i class="fa-solid fa-route"></i> Isochrone
             </a>
+
+            <div style="width: 1px; height: 20px; background: rgba(255,255,255,0.3); margin: 0 10px;"></div>
+
+            <div id="geoman-tools-container" style="display: flex; align-items: center;"></div>
         </div>
         <div id="map"></div>
     </section>
@@ -106,64 +112,67 @@
         <button id="toggle-right-panel" class="panel-toggle-btn" title="GeoJSON einklappen">▶</button>
     </div>
 
-   <section class="panel" id="right-panel">
-    <div class="panel-content" style="display: flex; flex-direction: column; height: 100%; padding: 15px;">
-        
-        <div class="tab-container" style="display: flex; gap: 2px; margin-bottom: 15px; background: var(--border-gray); padding: 2px; border-radius: 4px;">
-            <button id="tab-system" class="tab-btn active" style="flex: 1; padding: 8px; border: none; cursor: pointer; font-weight: 600; font-size: 0.85rem;">
-                <i class="fa-solid fa-bicycle"></i> Nextbike System
-            </button>
-            <button id="tab-imports" class="tab-btn" style="flex: 1; padding: 8px; border: none; cursor: pointer; font-weight: 600; font-size: 0.85rem;">
-                <i class="fa-solid fa-file-import"></i> Eigene Ebenen
-            </button>
-        </div>
-
-        <div id="view-system" class="tab-view" style="display: flex; flex-direction: column; flex-grow: 1;">
-            <textarea id="geojson-output" readonly placeholder="Hier erscheint der GeoJSON-Code des Systems..." style="flex-grow: 1; min-height: 300px;"></textarea>
-            <div class="row" style="margin-top: 15px;">
-                <button class="primary" id="geojsonBtn" disabled>💾 Stationen (.geojson)</button>
-                <button class="primary" id="zipBtn" disabled>💾 System (.zip)</button>
-            </div>
-            <div class="row">
-                <button id="download-selection-btn" class="primary" style="background-color: #f39c12;">
-            <i class="fa-solid fa-mouse-pointer"></i> Auswahl herunterladen (.geojson)
-    </button>
-</div>
-        </div>
-
-        <div id="view-imports" class="tab-view hidden" style="display: flex; flex-direction: column; flex-grow: 1;">
-            <div id="drag-drop-zone" style="min-height: 80px; padding: 10px; border: 2px dashed var(--border-gray); display: flex; align-items: center; justify-content: center; text-align: center; color: var(--text-muted); cursor: pointer; margin-bottom: 10px; background-color: var(--background-gray);">
-                <p style="margin: 0; font-size: 0.8rem;">GeoJSON hier ablegen</p>
-            </div>
+    <section class="panel" id="right-panel">
+        <div class="panel-content" style="display: flex; flex-direction: column; height: 100%; padding: 15px;">
             
-            <div id="file-explorer" class="file-explorer-container" style="background: white; border: 1px solid var(--border-gray); max-height: 150px; overflow-y: auto; margin-bottom: 10px;">
-                <ul id="imported-files-list" style="list-style: none; padding: 0; margin: 0;"></ul>
-            </div>
-
-            <label style="font-size: 0.8rem; font-weight: 700; color: var(--nextbike-dark-blue); margin-bottom: 5px;">
-                <i class="fa-solid fa-code"></i> Editor (Live-Bearbeitung)
-            </label>
-            <textarea id="import-editor" placeholder="Wähle eine Ebene aus der Liste zum Bearbeiten..." style="flex-grow: 1; min-height: 200px; font-family: monospace; font-size: 11px; padding: 10px; border: 1px solid var(--border-gray);"></textarea>
-            
-            <div class="row" style="margin-top: 10px;">
-                <button class="primary" id="save-import-btn" style="background-color: #28a745;">
-                    <i class="fa-solid fa-cloud-arrow-up"></i> Änderungen speichern
+            <div class="tab-container" style="display: flex; gap: 2px; margin-bottom: 15px; background: var(--border-gray); padding: 2px; border-radius: 4px;">
+                <button id="tab-system" class="tab-btn active" style="flex: 1;">
+                    <i class="fa-solid fa-bicycle"></i> Nextbike System
+                </button>
+                <button id="tab-imports" class="tab-btn" style="flex: 1;">
+                    <i class="fa-solid fa-file-import"></i> Eigene Ebenen
                 </button>
             </div>
+
+            <div id="view-system" class="tab-view" style="display: flex; flex-direction: column; flex-grow: 1;">
+                <textarea id="geojson-output" readonly placeholder="Hier erscheint der GeoJSON-Code des Systems..." style="flex-grow: 1; min-height: 300px;"></textarea>
+                
+                <div class="row" style="margin-top: 15px;">
+                    <button class="primary" id="geojsonBtn" disabled>💾 Stationen (.geojson)</button>
+                    <button class="primary" id="zipBtn" disabled>💾 System (.zip)</button>
+                </div>
+                
+                <div class="row">
+                    <button id="download-selection-btn" class="primary" style="background-color: #EED75B; color: #333;">
+                        <i class="fa-solid fa-mouse-pointer"></i> Auswahl herunterladen (.geojson)
+                    </button>
+                </div>
+            </div>
+
+            <div id="view-imports" class="tab-view hidden" style="display: flex; flex-direction: column; flex-grow: 1;">
+                <div id="drag-drop-zone" style="min-height: 80px; padding: 10px; border: 2px dashed var(--border-gray); display: flex; align-items: center; justify-content: center; text-align: center; color: var(--text-muted); cursor: pointer; margin-bottom: 10px; background-color: var(--background-gray);">
+                    <p style="margin: 0; font-size: 0.8rem;">GeoJSON hier ablegen</p>
+                </div>
+                
+                <div id="file-explorer" class="file-explorer-container" style="background: white; border: 1px solid var(--border-gray); max-height: 150px; overflow-y: auto; margin-bottom: 10px;">
+                    <ul id="imported-files-list" style="list-style: none; padding: 0; margin: 0;"></ul>
+                </div>
+
+                <label style="font-size: 0.8rem; font-weight: 700; color: var(--nextbike-dark-blue); margin-bottom: 5px;">
+                    <i class="fa-solid fa-code"></i> Editor (Live-Bearbeitung)
+                </label>
+                <textarea id="import-editor" placeholder="Wähle eine Ebene aus der Liste zum Bearbeiten..." style="flex-grow: 1; min-height: 200px; font-family: monospace; font-size: 11px; padding: 10px; border: 1px solid var(--border-gray);"></textarea>
+                
+                <div class="row" style="margin-top: 10px;">
+                    <button class="primary" id="save-import-btn" style="background-color: #28a745;">
+                        <i class="fa-solid fa-cloud-arrow-up"></i> Änderungen speichern
+                    </button>
+                </div>
+            </div>
         </div>
-    </div>
     </section>
   </div>
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-
+  
+  <script src="https://unpkg.com/@geoman-io/leaflet-geoman-free@latest/dist/leaflet-geoman.min.js"></script>
   <script src="https://unpkg.com/georaster"></script>
   <script src="https://unpkg.com/georaster-layer-for-leaflet/dist/georaster-layer-for-leaflet.min.js"></script>
   <script src="https://unpkg.com/geoblaze"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/chroma-js/2.4.2/chroma.min.js"></script>
-
   <script src="https://cdn.jsdelivr.net/npm/file-saver@2.0.5/dist/FileSaver.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+  <script src="https://unpkg.com/@turf/turf/turf.min.js"></script>
   
   <script type="module" src="js/main.js"></script>
 </body>
