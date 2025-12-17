@@ -6,10 +6,24 @@ import { IsochroneTool } from './isochrone.js';
 import { ENABLE_ISOCHRONE_TOOL } from './config.js';
 import { cityIcon } from './map.js';
 
+// WICHTIG: Diese Variablen müssen außerhalb der Funktionen stehen
 const importedLayers = {}; 
 let currentlyEditingId = null;
 
-// NEUE FUNKTION: Übernimmt das Befüllen der Dropdowns nach dem Laden
+/**
+ * Hilfsfunktion: Entfernt das Attribut 'serviceCases' aus allen Features
+ */
+function getCleanedGeoJSON(data) {
+    const cleanData = JSON.parse(JSON.stringify(data));
+    const features = cleanData.features || (cleanData.type === 'Feature' ? [cleanData] : []);
+    features.forEach(f => {
+        if (f.properties) {
+            delete f.properties.serviceCases; // Attribut restlos entfernen
+        }
+    });
+    return cleanData;
+}
+
 export function renderInitLists() {
     const cSel = $('#countrySelect'); 
     cSel.innerHTML = '';
@@ -34,20 +48,14 @@ export function renderInitLists() {
 export function setActiveTool(toolId) {
     const isAlreadyActive = (toolId === state.activeToolId);
     
-    // UI zurücksetzen
     document.querySelectorAll('.toolbar-btn').forEach(btn => btn.classList.remove('active'));
     document.querySelectorAll('.tool-section').forEach(el => el.classList.add('hidden'));
 
     if (isAlreadyActive) {
-        // --- DEAKTIVIEREN ---
         state.activeToolId = null;
         if (!$('#main-wrap').classList.contains('left-collapsed')) $('#toggle-left-panel').click(); 
-        
-        // CSS-Klasse entfernen (Cursor & Klickverhalten normalisieren)
         $('#map').classList.remove('isochrone-mode');
-
     } else {
-        // --- AKTIVIEREN ---
         state.activeToolId = toolId;
         const targetElement = $(`#${toolId}`);
         if (targetElement) targetElement.classList.remove('hidden');
@@ -55,12 +63,9 @@ export function setActiveTool(toolId) {
         if (targetButton) targetButton.classList.add('active');
         if ($('#main-wrap').classList.contains('left-collapsed')) $('#toggle-left-panel').click();
         
-        // Prüfen, welches Tool aktiv ist
         if (toolId === 'isochrone-controls') {
-            // Aktiviert CSS für Fadenkreuz & Klick-Durchlässigkeit
             $('#map').classList.add('isochrone-mode'); 
         } else {
-            // Bei anderen Tools wieder normal
             $('#map').classList.remove('isochrone-mode');
         }
     }
@@ -74,6 +79,7 @@ export function resetSystemView() {
     
     state.selectedBrandDomain = null;
     state.currentGeoJSON = null;
+    state.selectedFeatures.clear(); // Auch die Auswahl leeren
     
     $('#countrySelect').value = '';
     $('#brandSelect').value = ''; 
@@ -104,8 +110,6 @@ export function resetSystemView() {
     }
 }
 
-// js/ui.js
-
 export function refreshBrandSelect() {
     const countryCode = ($('#countrySelect').value || '').toUpperCase();
     const brandSel = $('#brandSelect');
@@ -115,7 +119,6 @@ export function refreshBrandSelect() {
 
     state.brandList.forEach(brand => {
         if (!countryCode || brand.country_codes.has(countryCode)) {
-            // UPDATED LINE: Added the domain in brackets to the label
             const labelWithDomain = `${brand.name} (${brand.domain})`;
             brandSel.appendChild(option(brand.domain, labelWithDomain));
         }
@@ -180,40 +183,32 @@ export function drawAllCityMarkers() {
         marker.on('click', function() {
             const brandSelect = $('#brandSelect');
             const domain = city.domain;
-
             $('#countrySelect').value = city.country_code;
             refreshBrandSelect();
             brandSelect.value = domain; 
-            
             $('#flexzonesCheckbox').checked = true;
             $('#businessAreasCheckbox').checked = true;
             $('#flexzonesCheckbox').disabled = false;
             $('#businessAreasCheckbox').disabled = false;
-            
             brandSelect.dispatchEvent(new Event('change'));
             setActiveTool('filter-controls');
         });
         marker.bindPopup(`<b>${city.name}</b><br>System: ${city.domain || 'N/A'}<br>Land: ${city.country_code}`);
         state.layers.cityLayer.addLayer(marker);
     });
-    
-    if (state.layers.cityLayer.getLayers().length > 0) state.map.fitBounds(state.layers.cityLayer.getBounds(), {padding: [50, 50]});
 }
 
 function updateAvailableBrands(){
     $('#brandSelect').value = ''; 
     state.selectedBrandDomain = null; 
     $('#citySelect').value = ''; 
-    
     $('#flexzone-toggle-container').classList.add('hidden');
     $('#flexzonesCheckbox').disabled = true;
     $('#businessAreasCheckbox').disabled = true;
-    
     refreshBrandSelect(); 
     refreshCitySelect();
 }
 
-// Event Listeners Setup
 export function initUI() {
     const wrap = $('#main-wrap');
     
@@ -230,7 +225,7 @@ export function initUI() {
         setTimeout(() => state.map.invalidateSize({debounceMoveend: true}), 350);
     });
 
-    // --- TAB LOGIK (RECHTES PANEL) ---
+    // --- TABS RECHTS ---
     $('#tab-system').addEventListener('click', () => {
         $('#tab-system').classList.add('active');
         $('#tab-imports').classList.remove('active');
@@ -242,36 +237,25 @@ export function initUI() {
         $('#tab-imports').classList.add('active');
         $('#tab-system').classList.remove('active');
         $('#view-imports').classList.remove('hidden');
-        $('#view-imports').classList.add('tab-view-active'); // CSS Hilfsklasse
         $('#view-system').classList.add('hidden');
     });
 
-    // --- EDITOR SPEICHER-LOGIK ---
+    // --- EDITOR SPEICHERN ---
     $('#save-import-btn').addEventListener('click', () => {
-        if (!currentlyEditingId) {
-            alert("Bitte wähle erst eine Ebene zum Bearbeiten aus.");
-            return;
-        }
+        if (!currentlyEditingId) return;
         try {
             const updatedGeoJSON = JSON.parse($('#import-editor').value);
-            // Alten Layer entfernen
             state.map.removeLayer(importedLayers[currentlyEditingId].layer);
-            // Neuen Layer mit aktualisierten Daten hinzufügen
             const newLayer = L.geoJSON(updatedGeoJSON).addTo(state.map);
             importedLayers[currentlyEditingId].layer = newLayer;
             importedLayers[currentlyEditingId].data = updatedGeoJSON;
-            alert("Änderungen erfolgreich auf Karte übernommen!");
-        } catch (e) {
-            alert("Fehler: Ungültiges GeoJSON-Format!");
-            console.error(e);
-        }
+            alert("Änderungen übernommen!");
+        } catch (e) { alert("Fehler: Ungültiges GeoJSON-Format!"); }
     });
 
-    // --- DRAG & DROP LOGIK ---
+    // --- DRAG & DROP ---
     const dropZone = $('#drag-drop-zone');
-    ['dragover', 'dragleave', 'drop'].forEach(evt => {
-        dropZone.addEventListener(evt, e => { e.preventDefault(); e.stopPropagation(); });
-    });
+    ['dragover', 'dragleave', 'drop'].forEach(evt => dropZone.addEventListener(evt, e => { e.preventDefault(); e.stopPropagation(); }));
     
     dropZone.addEventListener('drop', (e) => {
         const file = e.dataTransfer.files[0];
@@ -282,11 +266,7 @@ export function initUI() {
                     const geojson = JSON.parse(event.target.result);
                     const layerId = 'import_' + Date.now();
                     const layer = L.geoJSON(geojson).addTo(state.map);
-                    
-                    // Im Speicher ablegen
                     importedLayers[layerId] = { layer, data: geojson, name: file.name };
-                    
-                    // Automatisch zum Import-Tab wechseln
                     $('#tab-imports').click();
 
                     const list = $('#imported-files-list');
@@ -294,21 +274,16 @@ export function initUI() {
                     li.className = 'file-item';
                     li.id = `item-${layerId}`;
                     li.innerHTML = `
-                        <span class="file-name" title="Zoom zu: ${file.name}">
-                            <i class="fa-solid fa-layer-group"></i> ${file.name}
-                        </span>
+                        <span class="file-name"><i class="fa-solid fa-layer-group"></i> ${file.name}</span>
                         <div class="actions">
-                            <button class="edit-btn" title="Bearbeiten"><i class="fa-solid fa-pen-to-square"></i></button>
-                            <button class="remove-btn" title="Löschen"><i class="fa-solid fa-trash"></i></button>
-                        </div>
-                    `;
+                            <button class="edit-btn"><i class="fa-solid fa-pen-to-square"></i></button>
+                            <button class="remove-btn"><i class="fa-solid fa-trash"></i></button>
+                        </div>`;
 
-                    // Zoom bei Klick auf Namen
                     li.querySelector('.file-name').addEventListener('click', () => {
-                        state.map.fitBounds(importedLayers[layerId].layer.getBounds(), {padding: [20, 20]});
+                        state.map.fitBounds(importedLayers[layerId].layer.getBounds());
                     });
 
-                    // Bearbeiten Modus aktivieren
                     li.querySelector('.edit-btn').addEventListener('click', () => {
                         currentlyEditingId = layerId;
                         $('#import-editor').value = JSON.stringify(importedLayers[layerId].data, null, 2);
@@ -316,7 +291,6 @@ export function initUI() {
                         li.classList.add('editing');
                     });
 
-                    // Ebene löschen
                     li.querySelector('.remove-btn').addEventListener('click', () => {
                         state.map.removeLayer(importedLayers[layerId].layer);
                         delete importedLayers[layerId];
@@ -328,50 +302,38 @@ export function initUI() {
                     });
 
                     list.appendChild(li);
-                    li.querySelector('.edit-btn').click(); // Direkt zum Editor laden
-                    state.map.fitBounds(layer.getBounds(), {padding: [20, 20]});
-
-                } catch (err) { alert('Fehler beim Parsen der Datei.'); }
+                    li.querySelector('.edit-btn').click();
+                } catch { alert('Fehler beim Parsen.'); }
             };
             reader.readAsText(file);
-        } else { alert('Bitte eine .geojson Datei wählen.'); }
+        }
     });
 
-    // --- NEXTBIKE SYSTEM LISTENERS ---
-    $('#countrySelect').addEventListener('change', () => {
-        updateAvailableBrands();
-        $('#flexzone-toggle-container').classList.add('hidden');
-    });
+    // --- SYSTEM LISTENERS ---
+    $('#countrySelect').addEventListener('change', updateAvailableBrands);
 
     $('#brandSelect').addEventListener('change', () => {
         const selectedDomain = $('#brandSelect').value;
-        state.layers.stationLayer.clearLayers(); 
+        state.layers.stationLayer.clearLayers();
         state.layers.flexzoneLayer.clearLayers(); 
-        state.layers.businessAreaLayer.clearLayers(); 
+        state.layers.businessAreaLayer.clearLayers();
         $('#citySelect').value = '';
 
         if (selectedDomain) {
-            state.selectedBrandDomain = selectedDomain; 
+            state.selectedBrandDomain = selectedDomain;
             $('#flexzonesCheckbox').checked = true;
             $('#businessAreasCheckbox').checked = true;
             $('#flexzonesCheckbox').disabled = false;
             $('#businessAreasCheckbox').disabled = false;
             $('#flexzone-toggle-container').classList.remove('hidden'); 
-            
-            loadData(); 
-            refreshCitySelect(); 
-            state.layers.cityLayer.eachLayer(marker => { if (marker.getElement()) marker.getElement().style.display = 'none'; });
+            loadData();
+            refreshCitySelect();
         } else {
-            state.selectedBrandDomain = null;
-            $('#flexzonesCheckbox').disabled = true;
-            $('#businessAreasCheckbox').disabled = true;
-            $('#flexzone-toggle-container').classList.add('hidden');
-            
-            refreshCitySelect(); 
-            resetSystemView(); 
+            resetSystemView();
         }
     });
 
+    // FEHLTE: City Select Listener
     $('#citySelect').addEventListener('change', () => {
         const cityUid = $('#citySelect').value;
         $('#brandSelect').value = ''; 
@@ -403,27 +365,7 @@ export function initUI() {
         loadData();
     });
 
-    $('#loadBtn').addEventListener('click', loadData);
-    
-    document.querySelectorAll('#top-toolbar .toolbar-btn').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-            e.preventDefault();
-            setActiveTool(e.currentTarget.dataset.target);
-        });
-    });
-
-    document.addEventListener('keydown', (e) => {
-        if (e.key === 'Escape') {
-            e.preventDefault(); 
-            if (state.selectedBrandDomain || state.activeToolId) {
-                 resetSystemView();
-            } else {
-                 if (!wrap.classList.contains('left-collapsed')) $('#toggle-left-panel').click();
-                 if (!wrap.classList.contains('right-collapsed')) $('#toggle-right-panel').click();
-            }
-        }
-    });
-
+    // FEHLTE: Checkbox Listeners
     $('#flexzonesCheckbox').addEventListener('change', (e) => {
         if (state.selectedBrandDomain) loadData(); 
         else if (!e.target.checked && state.map.hasLayer(state.layers.flexzoneLayer)) state.map.removeLayer(state.layers.flexzoneLayer);
@@ -434,18 +376,24 @@ export function initUI() {
         else if (!e.target.checked && state.map.hasLayer(state.layers.businessAreaLayer)) state.map.removeLayer(state.layers.businessAreaLayer);
     });
 
+    // --- DOWNLOADS (BEREINIGT) ---
     $('#geojsonBtn').addEventListener('click', () => {
         if(!state.currentGeoJSON) return;
+        const cleaned = getCleanedGeoJSON(state.currentGeoJSON);
         const filename = generateFilename(state.selectedBrandDomain) + '.geojson';
-        const blob = new Blob([$('#geojson-output').value], {type:'application/geo+json;charset=utf-8'}); 
+        const blob = new Blob([JSON.stringify(cleaned, null, 2)], {type:'application/geo+json;charset=utf-8'}); 
         saveAs(blob, filename); 
     });
-    
+
+    // FEHLTE: ZIP Download Listener
     $('#zipBtn').addEventListener('click', async () => {
         if (!state.currentGeoJSON) return;
         const zip = new JSZip(); 
         const baseFilename = generateFilename(state.selectedBrandDomain);
-        zip.file("stations.geojson", JSON.stringify(state.currentGeoJSON, null, 2));
+        
+        // Stationen säubern und hinzufügen
+        const cleanedStations = getCleanedGeoJSON(state.currentGeoJSON);
+        zip.file("stations.geojson", JSON.stringify(cleanedStations, null, 2));
 
         const getSanitizedFeatureName = (feature, defaultPrefix) => {
              const props = feature.properties || {};
@@ -456,8 +404,9 @@ export function initUI() {
 
         const flexzoneGeoJSON = state.layers.flexzoneLayer.toGeoJSON();
         if (flexzoneGeoJSON.features.length > 0) {
-             zip.file("fullsystem_flexzones.geojson", JSON.stringify(flexzoneGeoJSON, null, 2));
-             flexzoneGeoJSON.features.forEach(feature => {
+             const cleanedFlex = getCleanedGeoJSON(flexzoneGeoJSON);
+             zip.file("fullsystem_flexzones.geojson", JSON.stringify(cleanedFlex, null, 2));
+             cleanedFlex.features.forEach(feature => {
                  const sanitizedName = getSanitizedFeatureName(feature, 'unbenannte_flexzone');
                  zip.file(`flexzone_${sanitizedName}.geojson`, JSON.stringify({ type: "FeatureCollection", features: [feature] }, null, 2));
              });
@@ -465,13 +414,65 @@ export function initUI() {
         
         const baGeoJSON = state.layers.businessAreaLayer.toGeoJSON();
         if (baGeoJSON.features.length > 0) {
-             zip.file("fullsystem_business_areas.geojson", JSON.stringify(baGeoJSON, null, 2));
-             baGeoJSON.features.forEach(feature => {
+             const cleanedBa = getCleanedGeoJSON(baGeoJSON);
+             zip.file("fullsystem_business_areas.geojson", JSON.stringify(cleanedBa, null, 2));
+             cleanedBa.features.forEach(feature => {
                  const sanitizedName = getSanitizedFeatureName(feature, 'unbenannte_business_area');
                  zip.file(`businessarea_${sanitizedName}.geojson`, JSON.stringify({ type: "FeatureCollection", features: [feature] }, null, 2));
              });
         }
         const zipBlob = await zip.generateAsync({type:"blob"});
         saveAs(zipBlob, baseFilename + ".zip"); 
+    });
+
+   // Selection Download (Bereinigt & mit Datums-Name)
+    $('#download-selection-btn')?.addEventListener('click', () => {
+        if (state.selectedFeatures.size === 0) return;
+
+        // 1. Datum generieren (YYYYMMDD)
+        const now = new Date();
+        const yyyy = now.getFullYear();
+        const mm = String(now.getMonth() + 1).padStart(2, '0');
+        const dd = String(now.getDate()).padStart(2, '0');
+        const dateStr = `${yyyy}${mm}${dd}`;
+
+        // 2. Systemnamen holen (oder Fallback)
+        const systemName = state.selectedBrandDomain || 'nextbike';
+
+        // 3. Dateinamen zusammenbauen
+        const filename = `${dateStr}_${systemName}_auswahl.geojson`;
+
+        // 4. Daten vorbereiten und speichern
+        const collection = {
+            type: "FeatureCollection",
+            features: Array.from(state.selectedFeatures.values())
+        };
+        const cleaned = getCleanedGeoJSON(collection);
+        const blob = new Blob([JSON.stringify(cleaned, null, 2)], {type:'application/geo+json'});
+        
+        saveAs(blob, filename);
+    });
+
+    // --- GLOBAL EVENTS ---
+    $('#loadBtn').addEventListener('click', loadData);
+    
+    document.querySelectorAll('#top-toolbar .toolbar-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.preventDefault();
+            setActiveTool(e.currentTarget.dataset.target);
+        });
+    });
+
+    // FEHLTE: Escape Key Listener
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+            e.preventDefault(); 
+            if (state.selectedBrandDomain || state.activeToolId) {
+                 resetSystemView();
+            } else {
+                 if (!wrap.classList.contains('left-collapsed')) $('#toggle-left-panel').click();
+                 if (!wrap.classList.contains('right-collapsed')) $('#toggle-right-panel').click();
+            }
+        }
     });
 }

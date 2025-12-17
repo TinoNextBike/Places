@@ -29,6 +29,7 @@ body {
     overflow: hidden;
 }
 
+/* --- LAYOUT & PANELS --- */
 .wrap {
     display: grid;
     grid-template-columns: var(--left-panel-width) var(--toggle-btn-width) 1fr var(--toggle-btn-width) var(--right-panel-width);
@@ -79,6 +80,7 @@ body {
     font-size: 14px;
 }
 
+/* --- MAP --- */
 #map-container {
     overflow: hidden;
     z-index: 100;
@@ -94,19 +96,19 @@ body {
     left: 0;
 }
 
-#geojson-output {
+/* --- FORM ELEMENTS --- */
+#geojson-output, #import-editor {
     width: 100%;
-    height: 100%;
-    border-radius: 0;
+    border-radius: 4px;
     border: 1px solid var(--border-gray);
     font-family: monospace;
-    font-size: 12px;
-    white-space: pre;
     resize: none;
     background-color: var(--text-light);
     color: var(--text-dark);
     padding: 12px;
 }
+
+#geojson-output { font-size: 12px; }
 
 label {
     display: block;
@@ -130,7 +132,7 @@ select, input[type="text"] {
 
 button {
     appearance: none;
-    border-radius: 0;
+    border-radius: 4px;
     padding: 10px 14px;
     font-weight: 600;
     cursor: pointer;
@@ -144,6 +146,11 @@ button.primary {
     color: var(--text-light);
     border: none;
     width: 100%;
+}
+button.primary:disabled {
+    background-color: var(--border-gray);
+    cursor: not-allowed;
+    opacity: 0.7;
 }
 
 .row {
@@ -179,6 +186,7 @@ button.primary {
     font-weight: 400;
 }
 
+/* --- SPINNER --- */
 .spinner {
     border: 2px solid rgba(255,255,255,0.3);
     border-top: 2px solid var(--text-light);
@@ -193,16 +201,15 @@ button.primary {
 
 @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 
-/* Checkbox Styles */
+/* --- CHECKBOXES --- */
 .checkbox-container {
     display: block;
     margin-top: 1rem;
     padding: 8px;
     background-color: var(--background-gray);
 }
-.checkbox-container.hidden {
-    display: none;
-}
+.checkbox-container.hidden { display: none; }
+
 .checkbox-row {
     display: flex;
     align-items: center;
@@ -226,7 +233,7 @@ button.primary {
     gap: 50px; 
 }
 
-/* Tool Sektionen */
+/* --- TOOL SECTIONS --- */
 .tool-section {
     transition: max-height 0.3s ease-in-out, opacity 0.3s ease-in-out;
     overflow: hidden;
@@ -239,11 +246,9 @@ button.primary {
     margin-top: 0 !important;
     margin-bottom: 0 !important;
 }
-.tool-section.hidden hr {
-    border-top: none;
-}
+.tool-section.hidden hr { border-top: none; }
 
-/* ORS Isochrone Buttons */
+/* --- ORS ISOCHRONE BUTTONS --- */
 .ors-range-btn {
     appearance: none;
     border-radius: 0;
@@ -265,7 +270,7 @@ button.primary {
     box-shadow: 0 0 0 2px rgba(0, 152, 255, 0.4);
 }
 .ors-range-btn.active:hover { background-color: var(--nextbike-dark-blue); }
-.ors-range-btn:disabled, .ors-range-btn[disabled] {
+.ors-range-btn:disabled {
     opacity: 0.6;
     cursor: not-allowed;
 }
@@ -274,7 +279,7 @@ button.primary {
     background-color: transparent !important;
 }
 
-/* Toolbar Oben */
+/* --- TOOLBAR TOP --- */
 #top-toolbar {
     position: absolute;
     top: 0;
@@ -313,129 +318,100 @@ button.primary {
 }
 
 /* Leaflet Controls Positionierung */
-.leaflet-control-zoom {
-    top: 54px !important; 
-    z-index: 600; 
-}
-.leaflet-control-layers {
-    top: 54px !important; 
-    z-index: 600; 
-}
+.leaflet-control-zoom { top: 54px !important; z-index: 600; }
+.leaflet-control-layers { top: 54px !important; z-index: 600; }
 
-/* Mobile Styles */
+/* --- MOBILE --- */
 @media (max-width: 768px) {
     :root {
         --left-panel-width: 90vw;
         --right-panel-width: 90vw;
         --toggle-btn-width: 40px;
     }
-
     body { overflow: hidden; }
-    
-    #top-toolbar {
-        top: 0;
-        left: 0;
-        padding: 0 55px; 
-        justify-content: space-around;
-    }
-
+    #top-toolbar { padding: 0 5px; justify-content: space-around; }
     .wrap {
         grid-template-columns: 1fr;
         grid-template-rows: 1fr;
         transition: none;
     }
-
     #map-container { padding-top: var(--top-toolbar-height); }
     .toggle-container { top: var(--top-toolbar-height); }
 }
-/* In style.css hinzufügen */
-.file-explorer-container {
-    background: var(--background-gray);
-    border: 1px solid var(--border-gray);
-    padding: 10px;
-    margin-bottom: 10px;
-    max-height: 150px;
-    overflow-y: auto;
-}
 
-.file-item {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 5px 8px;
-    background: white;
-    border: 1px solid #eee;
-    margin-bottom: 4px;
-    font-size: 0.85rem;
-}
-
-.remove-file-btn {
-    background: #ff4d4d;
-    color: white;
-    border: none;
-    padding: 2px 6px;
-    cursor: pointer;
-    font-size: 0.7rem;
-    border-radius: 2px;
-}
-
-.remove-file-btn:hover { background: #cc0000; }
-
-/* Tab Styling */
+/* --- TABS (RIGHT PANEL) --- */
 .tab-btn {
-    background: transparent;
+    padding: 10px;
+    border: 1px solid var(--border-gray);
+    background: var(--background-gray);
+    cursor: pointer;
+    font-weight: 600;
     color: var(--text-muted);
-    transition: all 0.2s;
-    border-radius: 3px;
+    border-radius: 4px;
+    transition: all 0.2s ease;
 }
+.tab-btn:hover { background: #e9ecef; }
 .tab-btn.active {
-    background: white;
-    color: var(--nextbike-dark-blue);
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    background: var(--nextbike-dark-blue);
+    color: var(--text-light);
+    border-color: var(--nextbike-dark-blue);
 }
+
+.tab-view { display: flex; flex-direction: column; height: 100%; }
 .tab-view.hidden { display: none !important; }
 
-/* File Explorer Styling */
+/* --- FILE EXPLORER LIST --- */
+.file-explorer-container {
+    background: #fff;
+    /* Container Styles werden inline im HTML überschrieben, aber dies ist Fallback */
+}
+
 .file-item {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 8px 10px;
-    border-bottom: 1px solid #f0f0f0;
-    font-size: 0.85rem;
+    padding: 8px 12px;
+    border-bottom: 1px solid #eee;
+    background: #fff;
+    font-size: 0.9rem;
     transition: background 0.2s;
 }
-.file-item:hover { background: #f9f9f9; }
+.file-item:hover { background: #f8f9fa; }
 .file-item.editing {
-    background: #eef7ff;
     border-left: 4px solid var(--nextbike-light-blue);
+    background: #eef7ff;
 }
-.file-item .file-name {
+
+.file-name {
     flex-grow: 1;
     cursor: pointer;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+    margin-right: 10px;
 }
-.file-item .actions { display: flex; gap: 8px; }
-.file-item button {
-    background: none; border: none; padding: 4px; cursor: pointer; color: var(--text-muted);
+
+.file-item .actions { display: flex; align-items: center; }
+.file-item .actions button {
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: var(--text-muted);
+    margin-left: 5px;
+    padding: 4px;
+    border-radius: 4px;
 }
-.file-item .edit-btn:hover { color: var(--nextbike-light-blue); }
-.file-item .remove-btn:hover { color: #dc3545; }
+.file-item .edit-btn:hover { color: var(--nextbike-light-blue); background: #eef7ff; }
+.file-item .remove-btn:hover { color: #dc3545; background: #ffeef0; }
+
 
 /* ==========================================================================
    WICHTIG: ISOCHRONE MODUS (Muss GANZ UNTEN stehen!)
-   Sorgt dafür, dass Klicks durch Polygone (Zonen) "durchfallen" auf die Karte.
 ========================================================================== */
-
-/* Wenn der Isochronen-Modus aktiv ist: 
-   Alle SVG-Pfade (Leaflet Polygone) ignorieren Maus-Events. */
 .isochrone-mode path.leaflet-interactive {
     pointer-events: none !important; 
 }
 
-/* Zeige ein Fadenkreuz, damit der Nutzer weiß, dass er klicken soll */
 .isochrone-mode,
 .isochrone-mode .leaflet-grab,
 .isochrone-mode .leaflet-container {
