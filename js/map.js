@@ -95,8 +95,7 @@ function handleFeatureClick(e, feature, layer) {
             // Highlight Style (Grün gestrichelt)
             layer.setStyle({ 
                 weight: 5, 
-                color: '#00FF00', 
-                dashArray: '5, 10', 
+                color: '#EED75B', 
                 fillOpacity: 0.5 
             });
         }
