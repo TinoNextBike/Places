@@ -348,6 +348,81 @@ button.primary {
     #map-container { padding-top: var(--top-toolbar-height); }
     .toggle-container { top: var(--top-toolbar-height); }
 }
+/* In style.css hinzufügen */
+.file-explorer-container {
+    background: var(--background-gray);
+    border: 1px solid var(--border-gray);
+    padding: 10px;
+    margin-bottom: 10px;
+    max-height: 150px;
+    overflow-y: auto;
+}
+
+.file-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 5px 8px;
+    background: white;
+    border: 1px solid #eee;
+    margin-bottom: 4px;
+    font-size: 0.85rem;
+}
+
+.remove-file-btn {
+    background: #ff4d4d;
+    color: white;
+    border: none;
+    padding: 2px 6px;
+    cursor: pointer;
+    font-size: 0.7rem;
+    border-radius: 2px;
+}
+
+.remove-file-btn:hover { background: #cc0000; }
+
+/* Tab Styling */
+.tab-btn {
+    background: transparent;
+    color: var(--text-muted);
+    transition: all 0.2s;
+    border-radius: 3px;
+}
+.tab-btn.active {
+    background: white;
+    color: var(--nextbike-dark-blue);
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+.tab-view.hidden { display: none !important; }
+
+/* File Explorer Styling */
+.file-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 10px;
+    border-bottom: 1px solid #f0f0f0;
+    font-size: 0.85rem;
+    transition: background 0.2s;
+}
+.file-item:hover { background: #f9f9f9; }
+.file-item.editing {
+    background: #eef7ff;
+    border-left: 4px solid var(--nextbike-light-blue);
+}
+.file-item .file-name {
+    flex-grow: 1;
+    cursor: pointer;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.file-item .actions { display: flex; gap: 8px; }
+.file-item button {
+    background: none; border: none; padding: 4px; cursor: pointer; color: var(--text-muted);
+}
+.file-item .edit-btn:hover { color: var(--nextbike-light-blue); }
+.file-item .remove-btn:hover { color: #dc3545; }
 
 /* ==========================================================================
    WICHTIG: ISOCHRONE MODUS (Muss GANZ UNTEN stehen!)
