@@ -1,6 +1,7 @@
 // js/map.js
 import { state } from './state.js';
 
+// Icons definieren
 export const nextbikeIcon = L.icon({
     iconUrl: 'bike-icon-dunkelblau.png',
     iconSize:    [25, 35],
@@ -15,12 +16,84 @@ export const cityIcon = L.icon({
     iconUrl: 'favicon.png'
 });
 
+// Standard Leaflet Icon Fix
 delete L.Icon.Default.prototype._getIconUrl;
 L.Icon.Default.mergeOptions({
     iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
     iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
     shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png'
 });
+
+// --- HILFSFUNKTIONEN FÜR SELEKTION ---
+
+function updateSelectionUI() {
+    const btn = document.getElementById('download-selection-btn');
+    if (btn) {
+        const count = state.selectedFeatures.size;
+        btn.disabled = count === 0;
+        btn.innerHTML = `<i class="fa-solid fa-mouse-pointer"></i> Auswahl (${count}) laden`;
+    }
+}
+
+function resetLayerStyle(layer) {
+    if (layer.setStyle && layer.feature) {
+        const category = layer.feature.properties.category;
+        let style = { weight: 2, dashArray: '', fillOpacity: 0.2, opacity: 0.8 };
+        
+        if (category === 'free_return') {
+            style.color = '#000000';
+            style.fillColor = '#000000';
+            style.weight = 1;
+        } else if (category === 'chargeable_return') {
+            style.color = '#FFA500';
+            style.fillColor = '#FFFF00';
+            style.weight = 1;
+            style.fillOpacity = 0.25;
+        } else if (category === 'business_area') {
+            style.color = "#FF0000";
+            style.fillColor = "#FF69B4";
+            style.opacity = 0.9;
+        } else {
+            style.color = "#0098FF";
+            style.fillColor = "#0098FF";
+        }
+        layer.setStyle(style);
+    }
+}
+
+function handleFeatureClick(e, feature, layer) {
+    L.DomEvent.stopPropagation(e);
+    // Prüfen auf STRG oder CMD Taste
+    const isMultiSelect = e.originalEvent.ctrlKey || e.originalEvent.metaKey;
+    const featureId = feature.properties.uid || feature.properties.station_id || feature.id || Math.random();
+
+    if (!isMultiSelect) {
+        // Alles deselektieren, wenn kein STRG gedrückt ist
+        state.selectedFeatures.clear();
+        state.layers.stationLayer.eachLayer(l => resetLayerStyle(l));
+        state.layers.flexzoneLayer.eachLayer(l => resetLayerStyle(l));
+        state.layers.businessAreaLayer.eachLayer(l => resetLayerStyle(l));
+    }
+
+    if (state.selectedFeatures.has(featureId)) {
+        state.selectedFeatures.delete(featureId);
+        resetLayerStyle(layer);
+    } else {
+        state.selectedFeatures.set(featureId, feature);
+        if (layer.setStyle) {
+            // Visuelle Auswahl: Neongrün gestrichelt
+            layer.setStyle({ 
+                weight: 5, 
+                color: '#00FF00', 
+                dashArray: '5, 10', 
+                fillOpacity: 0.5 
+            });
+        }
+    }
+    updateSelectionUI();
+}
+
+// --- HAUPTFUNKTIONEN ---
 
 export function initMap() {
     const osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '&copy; OpenStreetMap' });
@@ -30,14 +103,17 @@ export function initMap() {
 
     state.map = L.map('map', { layers: [positron], zoomControl: true }); 
 
+    // --- Stationen ---
     state.layers.stationLayer = L.geoJSON(null, {
         pointToLayer: (feature, latlng) => L.marker(latlng, {icon: nextbikeIcon}),
         onEachFeature: (f, l) => {
             const p = f.properties || {};
-            l.bindPopup(`<strong>${p.name||'Station'}</strong><br>Bikes: ${p.num_bikes_available ?? '–'}<br>Slots: ${p.num_docks_available ?? '–'}<br>ID: ${p.station_id}`);
+            l.bindPopup(`<strong>${p.name||'Station'}</strong><br>Bikes: ${p.num_bikes_available ?? '–'}<br>ID: ${p.station_id}`);
+            l.on('click', (e) => handleFeatureClick(e, f, l));
         }
     });
 
+    // --- Flexzonen ---
     state.layers.flexzoneLayer = L.geoJSON(null, {
         style: function(feature) {
             const category = feature.properties.category;
@@ -45,12 +121,19 @@ export function initMap() {
             if (category === 'chargeable_return') return { color: '#FFA500', weight: 1, opacity: 1, fillColor: '#FFFF00', fillOpacity: 0.25 };
             return { color: "#0098FF", weight: 2, opacity: 0.8, fillColor: "#0098FF", fillOpacity: 0.2 };
         },
-        onEachFeature: (f, l) => { if(f.properties.name) l.bindPopup(`<b>${f.properties.name}</b>`); }
+        onEachFeature: (f, l) => { 
+            if(f.properties.name) l.bindPopup(`<b>${f.properties.name}</b>`); 
+            l.on('click', (e) => handleFeatureClick(e, f, l));
+        }
     });
 
+    // --- Business Areas ---
     state.layers.businessAreaLayer = L.geoJSON(null, {
         style: function(feature) { return { color: "#FF0000", weight: 2, opacity: 0.9, fillColor: "#FF69B4", fillOpacity: 0.2 }; },
-        onEachFeature: (f, l) => { if(f.properties.name) l.bindPopup(`<b>Business Area: ${f.properties.name}</b>`); }
+        onEachFeature: (f, l) => { 
+            if(f.properties.name) l.bindPopup(`<b>Business Area: ${f.properties.name}</b>`); 
+            l.on('click', (e) => handleFeatureClick(e, f, l));
+        }
     });
 
     state.layers.cityLayer = L.featureGroup();
@@ -74,8 +157,6 @@ export function initMap() {
 }
 
 export async function addPopulationLayer(url) {
-    console.log("Lade Bevölkerungsdaten von:", url);
-    
     if (typeof parseGeoraster === 'undefined') {
         console.error("FEHLER: 'georaster' fehlt.");
         return;
@@ -90,12 +171,6 @@ export async function addPopulationLayer(url) {
         state.populationGeoRaster = georaster; 
 
         if (typeof GeoRasterLayer !== 'undefined') {
-            
-            // 1. Farbskala definieren (mit Chroma.js)
-            // Wir erstellen einen Verlauf von Hellblau über Gelb nach Rot (Heatmap Style)
-            // domain([min, max]) definiert, welcher Einwohner-Wert welche Farbe bekommt.
-            // Bei 100m Raster: Ein Wert von 50 ist schon dicht (5000/km²). 
-            // Passe die '100' an deine Daten an! (z.B. 5000 wenn die Daten pro km² sind)
             const scale = chroma.scale(['#f7f7f7', '#4dac26', '#ffffbf', '#d7191c'])
                                 .domain([0, 100]); 
 
@@ -105,21 +180,13 @@ export async function addPopulationLayer(url) {
                 resolution: 96,
                 pixelValuesToColorFn: values => {
                     const density = values[0];
-                    
-                    // Keine Einwohner oder Fehler -> Transparent
                     if (density <= 0 || isNaN(density)) return null;
-                    
-                    // Chroma.js nutzen, um die Farbe für den Wert zu holen
-                    // .hex() gibt den Hex-Code (z.B. #ff0000) zurück
                     return scale(density).hex();
                 }
             });
             
             state.mapLayersControl.addOverlay(layer, "Bevölkerungsdichte (Heatmap)");
         }
-        
-        console.log("Bevölkerungsdaten als Heatmap geladen!");
-
     } catch (e) {
         console.error("Fehler beim Laden des GeoTIFF:", e);
     }
