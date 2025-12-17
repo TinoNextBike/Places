@@ -101,6 +101,8 @@ export function resetSystemView() {
     }
 }
 
+// js/ui.js
+
 export function refreshBrandSelect() {
     const countryCode = ($('#countrySelect').value || '').toUpperCase();
     const brandSel = $('#brandSelect');
@@ -110,7 +112,9 @@ export function refreshBrandSelect() {
 
     state.brandList.forEach(brand => {
         if (!countryCode || brand.country_codes.has(countryCode)) {
-            brandSel.appendChild(option(brand.domain, brand.name));
+            // UPDATED LINE: Added the domain in brackets to the label
+            const labelWithDomain = `${brand.name} (${brand.domain})`;
+            brandSel.appendChild(option(brand.domain, labelWithDomain));
         }
     });
     brandSel.value = currentVal;
