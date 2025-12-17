@@ -1,7 +1,7 @@
 // js/map.js
 import { state } from './state.js';
 
-// Icons definieren
+// --- ICONS ---
 export const nextbikeIcon = L.icon({
     iconUrl: 'bike-icon-dunkelblau.png',
     iconSize:    [25, 35],
@@ -16,7 +16,7 @@ export const cityIcon = L.icon({
     iconUrl: 'favicon.png'
 });
 
-// Standard Leaflet Icon Fix
+// Leaflet Default Icon Fix
 delete L.Icon.Default.prototype._getIconUrl;
 L.Icon.Default.mergeOptions({
     iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
@@ -24,8 +24,10 @@ L.Icon.Default.mergeOptions({
     shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png'
 });
 
-// --- HILFSFUNKTIONEN FÜR SELEKTION ---
 
+// --- SELECTION LOGIC ---
+
+// Aktualisiert den Button im UI (rechter Panel)
 function updateSelectionUI() {
     const btn = document.getElementById('download-selection-btn');
     if (btn) {
@@ -35,6 +37,7 @@ function updateSelectionUI() {
     }
 }
 
+// Setzt den Style eines Layers auf den Standard zurück
 function resetLayerStyle(layer) {
     if (layer.setStyle && layer.feature) {
         const category = layer.feature.properties.category;
@@ -54,6 +57,7 @@ function resetLayerStyle(layer) {
             style.fillColor = "#FF69B4";
             style.opacity = 0.9;
         } else {
+            // Standard Nextbike Blau
             style.color = "#0098FF";
             style.fillColor = "#0098FF";
         }
@@ -61,27 +65,34 @@ function resetLayerStyle(layer) {
     }
 }
 
+// Zentrale Funktion zum Aufheben aller Auswahlen
+function clearAllSelections() {
+    state.selectedFeatures.clear();
+    state.layers.stationLayer.eachLayer(l => resetLayerStyle(l));
+    state.layers.flexzoneLayer.eachLayer(l => resetLayerStyle(l));
+    state.layers.businessAreaLayer.eachLayer(l => resetLayerStyle(l));
+    updateSelectionUI();
+}
+
+// Klick-Handler für Features (STRG für Mehrfachauswahl)
 function handleFeatureClick(e, feature, layer) {
     L.DomEvent.stopPropagation(e);
-    // Prüfen auf STRG oder CMD Taste
     const isMultiSelect = e.originalEvent.ctrlKey || e.originalEvent.metaKey;
     const featureId = feature.properties.uid || feature.properties.station_id || feature.id || Math.random();
 
     if (!isMultiSelect) {
-        // Alles deselektieren, wenn kein STRG gedrückt ist
-        state.selectedFeatures.clear();
-        state.layers.stationLayer.eachLayer(l => resetLayerStyle(l));
-        state.layers.flexzoneLayer.eachLayer(l => resetLayerStyle(l));
-        state.layers.businessAreaLayer.eachLayer(l => resetLayerStyle(l));
+        // Bei einfachem Klick alles andere deselektieren
+        clearAllSelections(); 
     }
 
+    // Toggle Logik für das angeklickte Feature
     if (state.selectedFeatures.has(featureId)) {
         state.selectedFeatures.delete(featureId);
         resetLayerStyle(layer);
     } else {
         state.selectedFeatures.set(featureId, feature);
         if (layer.setStyle) {
-            // Visuelle Auswahl: Neongrün gestrichelt
+            // Highlight Style (Grün gestrichelt)
             layer.setStyle({ 
                 weight: 5, 
                 color: '#00FF00', 
@@ -93,7 +104,8 @@ function handleFeatureClick(e, feature, layer) {
     updateSelectionUI();
 }
 
-// --- HAUPTFUNKTIONEN ---
+
+// --- MAP INITIALIZATION ---
 
 export function initMap() {
     const osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '&copy; OpenStreetMap' });
@@ -103,7 +115,19 @@ export function initMap() {
 
     state.map = L.map('map', { layers: [positron], zoomControl: true }); 
 
-    // --- Stationen ---
+    // NEU: Rechtsklick auf Karte hebt Auswahl auf
+    state.map.on('contextmenu', (e) => {
+        clearAllSelections();
+        // Optional: Verhindert das Browser-Kontextmenü, falls gewünscht:
+        // e.originalEvent.preventDefault(); 
+    });
+
+    // Optional: Auch Linksklick auf leere Karte hebt Auswahl auf
+    state.map.on('click', () => {
+        clearAllSelections();
+    });
+
+    // Station Layer
     state.layers.stationLayer = L.geoJSON(null, {
         pointToLayer: (feature, latlng) => L.marker(latlng, {icon: nextbikeIcon}),
         onEachFeature: (f, l) => {
@@ -113,7 +137,7 @@ export function initMap() {
         }
     });
 
-    // --- Flexzonen ---
+    // Flexzone Layer
     state.layers.flexzoneLayer = L.geoJSON(null, {
         style: function(feature) {
             const category = feature.properties.category;
@@ -127,7 +151,7 @@ export function initMap() {
         }
     });
 
-    // --- Business Areas ---
+    // Business Area Layer
     state.layers.businessAreaLayer = L.geoJSON(null, {
         style: function(feature) { return { color: "#FF0000", weight: 2, opacity: 0.9, fillColor: "#FF69B4", fillOpacity: 0.2 }; },
         onEachFeature: (f, l) => { 
@@ -171,8 +195,7 @@ export async function addPopulationLayer(url) {
         state.populationGeoRaster = georaster; 
 
         if (typeof GeoRasterLayer !== 'undefined') {
-            const scale = chroma.scale(['#f7f7f7', '#4dac26', '#ffffbf', '#d7191c'])
-                                .domain([0, 100]); 
+            const scale = chroma.scale(['#f7f7f7', '#4dac26', '#ffffbf', '#d7191c']).domain([0, 100]); 
 
             const layer = new GeoRasterLayer({
                 georaster: georaster,
@@ -184,7 +207,6 @@ export async function addPopulationLayer(url) {
                     return scale(density).hex();
                 }
             });
-            
             state.mapLayersControl.addOverlay(layer, "Bevölkerungsdichte (Heatmap)");
         }
     } catch (e) {
